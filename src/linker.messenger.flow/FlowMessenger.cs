@@ -35,9 +35,11 @@ namespace linker.messenger.flow
         {
             messengerFlow.Add(id, receiveBytes, sendtBytes);
         }
+        public override void AddStopwatch(ushort id, long time, MessageTypes type)
+        {
+            messengerFlow.AddStopwatch(id, time, type);
+        }
     }
-
-
 
     public sealed class FlowMessenger : IFlow
     {
@@ -47,7 +49,7 @@ namespace linker.messenger.flow
         public VersionManager Version { get; } = new VersionManager();
 
         private ConcurrentDictionary<ushort, FlowItemInfo> flows = new ConcurrentDictionary<ushort, FlowItemInfo>();
-        private ConcurrentDictionary<ushort, FlowItemInfo> stopwatchs = new ConcurrentDictionary<ushort, FlowItemInfo>();
+        private readonly ConcurrentDictionary<ushort, FlowItemInfo> stopwatchs = new ConcurrentDictionary<ushort, FlowItemInfo>();
 
         public FlowMessenger()
         {

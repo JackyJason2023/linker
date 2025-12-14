@@ -4,19 +4,19 @@
             <a href="javascript:;" class="download" @click="handleUpdate(values)" :title="updaterText" :class="updaterColor">
                 <span>
                     <span>{{item.Version}}</span>
-                    <template v-if="updater.list[item.MachineId]">
-                        <template v-if="updater.list[item.MachineId].Status == 1">
+                    <template v-if="item.hook_updater">
+                        <template v-if="item.hook_updater.Status == 1">
                             <el-icon size="14" class="loading"><Loading /></el-icon>
                         </template>
-                        <template v-else-if="updater.list[item.MachineId].Status == 2">
+                        <template v-else-if="item.hook_updater.Status == 2">
                             <el-icon size="14"><Download /></el-icon>
                         </template>
-                        <template v-else-if="updater.list[item.MachineId].Status == 3 || updater.list[item.MachineId].Status == 5">
+                        <template v-else-if="item.hook_updater.Status == 3 || item.hook_updater.Status == 5">
                             <el-icon size="14" class="loading"><Loading /></el-icon>
-                            <span class="progress" v-if="updater.list[item.MachineId].Length ==0">0%</span>
-                            <span class="progress" v-else>{{parseInt(updater.list[item.MachineId].Current/updater.list[item.MachineId].Length*100)}}%</span>
+                            <span class="progress" v-if="item.hook_updater.Length ==0">0%</span>
+                            <span class="progress" v-else>{{parseInt(item.hook_updater.Current/item.hook_updater.Length*100)}}%</span>
                         </template>
-                        <template v-else-if="updater.list[item.MachineId].Status == 6">
+                        <template v-else-if="item.hook_updater.Status == 6">
                             <el-icon size="14" class="yellow"><CircleCheck /></el-icon>
                         </template>
                     </template>
@@ -25,34 +25,35 @@
                     </template>
                 </span>
             </a>
-            <a href="javascript:;" class="download" title="检查更新" @click="handleCheck"><el-icon><Refresh /></el-icon></a>
         </template>
     </AccessBoolean>   
 </template>
 
 <script>
 import { injectGlobalData } from '@/provide';
-import { computed, h, ref } from 'vue';
-import { ElMessage, ElMessageBox, ElOption, ElSelect } from 'element-plus';
-import { checkUpdater } from '@/apis/updater';
-import {Download,Loading,CircleCheck,Refresh} from '@element-plus/icons-vue'
+import { computed} from 'vue';
+import { ElMessage, ElMessageBox} from 'element-plus';
+import {  exit } from '@/apis/updater';
+import {Download,Loading,CircleCheck} from '@element-plus/icons-vue'
 import { useUpdater } from './updater';
+import { useI18n } from 'vue-i18n';
 
 export default {
     props:['item','config'],
-    components:{Download,Loading,CircleCheck,Refresh},
+    components:{Download,Loading,CircleCheck},
     setup (props) {
 
+        const {t} = useI18n();
         const globalData = injectGlobalData();
         const updater = useUpdater();
         const serverVersion = computed(()=>globalData.value.signin.Version);
         const updaterVersion = computed(()=>updater.value.current.Version);
         const updaterText = computed(()=>{
-            if(!updater.value.list[props.item.MachineId]){
+            if(!props.item.hook_updater){
                 return '未检测到更新';
             }
             
-            if(updater.value.list[props.item.MachineId].Status <= 2) {
+            if(props.item.hook_updater.Status <= 2) {
                 return props.item.Version != serverVersion.value 
                 ? `与服务器版本(${serverVersion.value})不一致，建议更新` 
                 : updaterVersion.value != props.item.Version 
@@ -64,17 +65,18 @@ export default {
                 4:'已下载',
                 5:'正在解压',
                 6:'已解压，请重启',
-            }[updater.value.list[props.item.MachineId].Status];
+            }[props.item.hook_updater.Status];
         })
         const updaterColor = computed(()=>{
             return props.item.Version != serverVersion.value 
             ? 'red' 
-            : updater.value.list[props.item.MachineId] && updaterVersion.value != props.item.Version 
+            : props.item.hook_updater &&  updaterVersion.value != props.item.Version 
                 ? 'yellow' :'green'
         })
         const handleUpdate = (access)=>{
             updater.value.device = props.item;
             if(!props.config){
+                ElMessage.error('?');
                 return;
             }
             if(!access.UpdateSelf){
@@ -86,18 +88,17 @@ export default {
                 return;
             }
 
-            const updateInfo = updater.value.list[props.item.MachineId];
-            if(!updateInfo){
+            if(!props.item.hook_updater){
                 ElMessage.error('未检测到更新');
                 return;
             }
             //未检测，检测中，下载中，解压中
-            if([0,1,3,5].indexOf(updateInfo.Status)>=0){
+            if([0,1,3,5].indexOf(props.item.hook_updater.Status)>=0){
                 ElMessage.error('操作中，请稍后!');
                 return;
             }
             //已解压
-            if(updateInfo.Status == 6){
+            if(props.item.hook_updater.Status == 6){
                 ElMessageBox.confirm('确定关闭程序吗？', '提示', {
                     confirmButtonText: '确定',
                     cancelButtonText: '取消',
@@ -107,33 +108,12 @@ export default {
                 }).catch(() => {});
                 return;
             }
-            updater.value.show = updateInfo.Status == 2;
-        }
-        const handleCheck = ()=>{
-            const selectedValue = ref(props.item.MachineId);
-            const selectOptions = [
-                h(ElOption, { label: `仅检查[${props.item.MachineName}]`, value: props.item.MachineId }),
-                h(ElOption, { label: `仅检查[本组所有]`, value: 'g-all' }),
-            ];
-            ElMessageBox({
-                title: '选择检查对象',
-                message: () => h(ElSelect, {
-                    modelValue: selectedValue.value,
-                    placeholder: '请选择',
-                    style:'width:20rem;',
-                    'onUpdate:modelValue': (val) => {
-                        selectedValue.value = val
-                    }
-                }, selectOptions),
-                confirmButtonText: '确定',
-                cancelButtonText: '取消'
-            }).then(() => {
-                checkUpdater(selectedValue.value == props.item.MachineId ? selectedValue.value : '');
-            }).catch(() => {});
+            updater.value.show = props.item.hook_updater.Status == 2;
         }
 
+       
         return {
-            item:computed(()=>props.item),updater,updaterText,updaterColor,handleUpdate,handleCheck
+            updater,updaterText,updaterColor,handleUpdate
         }
     }
 }

@@ -7,6 +7,7 @@ using linker.messenger.flow.history;
 using linker.messenger.forward;
 using linker.messenger.listen;
 using linker.messenger.logger;
+using linker.messenger.node;
 using linker.messenger.pcp;
 using linker.messenger.plan;
 using linker.messenger.relay.client;
@@ -69,8 +70,11 @@ namespace linker.messenger.store.file
             serviceCollection.AddSingleton<IUpdaterServerStore, UpdaterServerStore>();
 
             serviceCollection.AddSingleton<IRelayClientStore, RelayClientStore>();
-            serviceCollection.AddSingleton<IRelayServerNodeStore, RelayServerNodeStore>();
-            serviceCollection.AddSingleton<IRelayServerMasterStore, RelayServerMasterStore>();
+            serviceCollection.AddSingleton<IRelayNodeConfigStore, RelayServerConfigStore>();
+            serviceCollection.AddSingleton<IRelayNodeStore, RelayServerNodeStore>();
+            serviceCollection.AddSingleton<IRelayServerWhiteListStore, RelayNodeWhiteListStore>();
+            serviceCollection.AddSingleton<IRelayServerMasterDenyStore, RelayServerMasterDenyStore>();
+
 
             serviceCollection.AddSingleton<ITunnelClientStore, TunnelClientStore>();
 
@@ -95,9 +99,10 @@ namespace linker.messenger.store.file
             serviceCollection.AddSingleton<ISocks5Store, Socks5Store>();
 
             serviceCollection.AddSingleton<ISForwardClientStore, SForwardClientStore>();
-            serviceCollection.AddSingleton<ISForwardServerStore, SForwardServerStore>();
-            serviceCollection.AddSingleton<ISForwardServerNodeStore, SForwardServerNodeStore>();
-            serviceCollection.AddSingleton<ISForwardServerMasterStore, SForwardServerMasterStore>();
+            serviceCollection.AddSingleton<ISForwardNodeConfigStore, SForwardServerConfigStore>();
+            serviceCollection.AddSingleton<ISForwardNodeStore, SForwardServerNodeStore>();
+            serviceCollection.AddSingleton<ISForwardServerWhiteListStore, SForwardNodeWhiteListStore>();
+            serviceCollection.AddSingleton<ISForwardServerMasterDenyStore, SForwardServerMasterDenyStore>();
 
             serviceCollection.AddSingleton<ILoggerStore, LoggerStore>();
 

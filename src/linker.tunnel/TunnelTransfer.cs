@@ -19,6 +19,7 @@ namespace linker.tunnel
         private readonly TunnelWanPortTransfer tunnelWanPortTransfer;
         private readonly TunnelUpnpTransfer tunnelUpnpTransfer;
 
+        public VersionManager OperatingVersion => operating.DataVersion;
         public ConcurrentDictionary<string, bool> Operating => operating.StringKeyValue;
         private readonly OperatingMultipleManager operating = new OperatingMultipleManager();
         private uint flowid = 1;
@@ -52,62 +53,25 @@ namespace linker.tunnel
         }
         private async Task RebuildTransports()
         {
-            var transportItems = (await tunnelMessengerAdapter.GetTunnelTransports().ConfigureAwait(false)).ToList();
-            //有新的协议
-            var newTransportNames = transports.Select(c => c.Name).Except(transportItems.Select(c => c.Name));
-            if (newTransportNames.Any())
-            {
-                transportItems.AddRange(transports.Where(c => newTransportNames.Contains(c.Name)).Select(c => new TunnelTransportItemInfo
-                {
-                    Label = c.Label,
-                    Name = c.Name,
-                    ProtocolType = c.ProtocolType.ToString(),
-                    Reverse = c.Reverse,
-                    DisableReverse = c.DisableReverse,
-                    SSL = c.SSL,
-                    DisableSSL = c.DisableSSL,
-                    Order = c.Order
-                }));
-            }
-            //有已移除的协议
-            var oldTransportNames = transportItems.Select(c => c.Name).Except(transports.Select(c => c.Name));
-            if (oldTransportNames.Any())
-            {
-                foreach (var item in transportItems.Where(c => oldTransportNames.Contains(c.Name)))
-                {
-                    transportItems.Remove(item);
-                }
-            }
-            //强制更新一些信息
-            foreach (var item in transportItems)
-            {
-                var transport = transports.FirstOrDefault(c => c.Name == item.Name);
-                if (transport != null)
-                {
-                    item.DisableReverse = transport.DisableReverse;
-                    item.DisableSSL = transport.DisableSSL;
-                    item.Name = transport.Name;
-                    item.Label = transport.Label;
-                    if (transport.DisableReverse)
-                    {
-                        item.Reverse = transport.Reverse;
-                    }
-                    if (transport.DisableSSL)
-                    {
-                        item.SSL = transport.SSL;
-                    }
-                    if (item.Order == 0)
-                    {
-                        item.Order = transport.Order;
-                    }
-                }
-            }
-
-            await tunnelMessengerAdapter.SetTunnelTransports(transportItems).ConfigureAwait(false);
-
+            await tunnelMessengerAdapter.SetTunnelTransports(Helper.GlobalString, transports).ConfigureAwait(false);
             if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                 LoggerHelper.Instance.Info($"load tunnel transport:{string.Join(",", transports.Select(c => c.GetType().Name))}");
         }
+
+        public void AddTransport(ITunnelTransport transport)
+        {
+            if (transports.Any(c => c.Name == transport.Name) == false)
+            {
+                transport.OnConnected = OnConnected;
+                transports.Add(transport);
+                _ = RebuildTransports();
+            }
+        }
+        public void AddProtocol(ITunnelWanPortProtocol protocol)
+        {
+            tunnelWanPortTransfer.AddProtocol(protocol);
+        }
+
 
         /// <summary>
         /// 刷新一下网络信息，比如路由级别，本机IP等
@@ -200,28 +164,29 @@ namespace linker.tunnel
         /// </summary>
         /// <param name="remoteMachineId">对方id</param>
         /// <param name="transactionId">事务id，随便起，你喜欢就好</param>
-        /// <param name="denyProtocols">本次连接排除那些打洞协议</param>
-        /// <returns></returns>
-        public async Task<ITunnelConnection> ConnectAsync(string remoteMachineId, string transactionId, TunnelProtocolType denyProtocols)
-        {
-            return await ConnectAsync(remoteMachineId, transactionId, transactionId, denyProtocols).ConfigureAwait(false);
-        }
-        /// <summary>
-        /// 开始连接对方
-        /// </summary>
-        /// <param name="remoteMachineId">对方id</param>
-        /// <param name="transactionId">事务id，随便起，你喜欢就好</param>
         /// <param name="transactionTag">事务tag，随便起，你喜欢就好</param>
         /// <param name="denyProtocols">本次连接排除那些打洞协议</param>
+        /// <param name="transportNames">只要哪些协议名</param>
+        /// <param name="exTransportNames">排除哪些协议名</param>
         /// <returns></returns>
-        public async Task<ITunnelConnection> ConnectAsync(string remoteMachineId, string transactionId, string transactionTag, TunnelProtocolType denyProtocols)
+        public async Task<ITunnelConnection> ConnectAsync(string remoteMachineId, string transactionId,
+            TunnelProtocolType denyProtocols, string transactionTag = "", string[] transportNames = null, string[] exTransportNames = null)
         {
             if (operating.StartOperation(BuildKey(remoteMachineId, transactionId)) == false) return null;
 
             try
             {
-                var _transports = await tunnelMessengerAdapter.GetTunnelTransports().ConfigureAwait(false);
-                foreach (TunnelTransportItemInfo transportItem in _transports.OrderBy(c => c.Order).Where(c => c.Disabled == false))
+                var query = (await tunnelMessengerAdapter.GetTunnelTransports(remoteMachineId).ConfigureAwait(false)).OrderBy(c => c.Order).Where(c => c.Disabled == false);
+                if (transportNames != null && transportNames.Length > 0)
+                {
+                    query = query.Where(c => transportNames.Contains(c.Name));
+                }
+                if (exTransportNames != null && exTransportNames.Length > 0)
+                {
+                    query = query.Where(c => exTransportNames.Contains(c.Name) == false);
+                }
+
+                foreach (TunnelTransportItemInfo transportItem in query.ToList())
                 {
                     ITunnelTransport transport = transports.FirstOrDefault(c => c.Name == transportItem.Name);
 
@@ -339,7 +304,8 @@ namespace linker.tunnel
             }
             try
             {
-                var _transports = await tunnelMessengerAdapter.GetTunnelTransports().ConfigureAwait(false);
+                var _transports = await tunnelMessengerAdapter.GetTunnelTransports(tunnelTransportInfo.Remote.MachineId).ConfigureAwait(false);
+
                 ITunnelTransport transport = transports.FirstOrDefault(c => c.Name == tunnelTransportInfo.TransportName && c.ProtocolType == tunnelTransportInfo.TransportType);
                 TunnelTransportItemInfo item = _transports.FirstOrDefault(c => c.Name == tunnelTransportInfo.TransportName && c.Disabled == false);
                 if (transport != null && item != null)
@@ -472,6 +438,8 @@ namespace linker.tunnel
 
         private void ParseRemoteEndPoint(TunnelTransportInfo tunnelTransportInfo)
         {
+            if (tunnelTransportInfo.Local == null || tunnelTransportInfo.Remote == null) return;
+
             //要连接哪些IP
             List<IPEndPoint> eps = new List<IPEndPoint>();
             var excludeips = tunnelMessengerAdapter.GetExcludeIps();
@@ -549,7 +517,7 @@ namespace linker.tunnel
                     {
                         if (stopCallback()) break;
 
-                        connection = await ConnectAsync(remoteMachineId, transactionId, denyProtocols).ConfigureAwait(false);
+                        connection = await ConnectAsync(remoteMachineId, transactionId, denyProtocols, exTransportNames: ["TcpRelay"]).ConfigureAwait(false);
                         if (connection != null)
                         {
                             break;

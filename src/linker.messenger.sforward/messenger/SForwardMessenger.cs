@@ -1,17 +1,17 @@
-﻿using linker.plugins.sforward.proxy;
-using System.Net;
-using linker.libs;
-using linker.messenger;
-using linker.messenger.signin;
-using linker.messenger.sforward;
-using linker.messenger.sforward.server.validator;
-using linker.messenger.sforward.server;
-using linker.messenger.sforward.client;
-using System.Net.Sockets;
-using linker.libs.timer;
+﻿using linker.libs;
 using linker.libs.extends;
+using linker.libs.timer;
+using linker.messenger.node;
+using linker.messenger.sforward.client;
+using linker.messenger.sforward.server;
+using linker.messenger.sforward.server.validator;
+using linker.messenger.signin;
+using linker.plugins.sforward.proxy;
+using System.Net;
+using System.Net.Sockets;
+using static linker.libs.winapis.Wininet;
 
-namespace linker.plugins.sforward.messenger
+namespace linker.messenger.sforward.messenger
 {
     /// <summary>
     /// 穿透服务端
@@ -27,12 +27,12 @@ namespace linker.plugins.sforward.messenger
         private readonly ISerializer serializer;
         private readonly SForwardServerMasterTransfer sForwardServerMasterTransfer;
         private readonly SForwardServerNodeTransfer sForwardServerNodeTransfer;
-        private readonly ISignInServerStore signInServerStore;
+        private readonly SForwardServerNodeReportTransfer sForwardServerNodeReportTransfer;
 
         public SForwardServerMessenger(SForwardProxy proxy, ISForwardServerCahing sForwardServerCahing, IMessengerSender sender,
             SignInServerCaching signCaching, SForwardValidatorTransfer validator, ISerializer serializer,
             SForwardServerMasterTransfer sForwardServerMasterTransfer, SForwardServerNodeTransfer sForwardServerNodeTransfer,
-            ISignInServerStore signInServerStore)
+            SForwardServerNodeReportTransfer sForwardServerNodeReportTransfer)
         {
             this.proxy = proxy;
             proxy.WebConnect = WebConnect;
@@ -45,148 +45,74 @@ namespace linker.plugins.sforward.messenger
             this.serializer = serializer;
             this.sForwardServerMasterTransfer = sForwardServerMasterTransfer;
             this.sForwardServerNodeTransfer = sForwardServerNodeTransfer;
-            this.signInServerStore = signInServerStore;
+            this.sForwardServerNodeReportTransfer = sForwardServerNodeReportTransfer;
 
             ClearTask();
-        }
 
+        }
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
         [MessengerId((ushort)SForwardMessengerIds.Nodes)]
         public async Task Nodes(IConnection connection)
         {
             if (signCaching.TryGet(connection.Id, out SignCacheInfo cache) == false)
             {
-                connection.Write(serializer.Serialize(new List<SForwardServerNodeReportInfo>()));
+                connection.Write(serializer.Serialize(new List<SForwardServerNodeStoreInfo>()));
                 return;
             }
 
-            var nodes = await sForwardServerMasterTransfer.GetNodes(cache.Super, cache.UserId, cache.MachineId);
+            var nodes = await sForwardServerNodeReportTransfer.GetNodes(cache.Super, cache.UserId, cache.MachineId);
 
             connection.Write(serializer.Serialize(nodes));
         }
-        [MessengerId((ushort)SForwardMessengerIds.NodeReport)]
-        public void NodeReport(IConnection connection)
-        {
-            try
-            {
-                SForwardServerNodeReportInfo info = serializer.Deserialize<SForwardServerNodeReportInfo>(connection.ReceiveRequestWrap.Payload.Span);
-                sForwardServerMasterTransfer.SetNodeReport(connection, info);
-            }
-            catch (Exception)
-            {
-            }
-
-            connection.Write(serializer.Serialize(VersionHelper.Version));
-        }
-        [MessengerId((ushort)SForwardMessengerIds.Edit)]
-        public void Edit(IConnection connection)
-        {
-            SForwardServerNodeUpdateInfo info = serializer.Deserialize<SForwardServerNodeUpdateInfo>(connection.ReceiveRequestWrap.Payload.Span);
-            sForwardServerNodeTransfer.Edit(info);
-        }
-        [MessengerId((ushort)SForwardMessengerIds.EditForward)]
-        public async Task EditForward188(IConnection connection)
-        {
-            SForwardServerNodeUpdateWrapInfo info = serializer.Deserialize<SForwardServerNodeUpdateWrapInfo>(connection.ReceiveRequestWrap.Payload.Span);
-            if (signCaching.TryGet(connection.Id, out SignCacheInfo cache) && cache.Super)
-            {
-                await sForwardServerMasterTransfer.Edit(info.Info).ConfigureAwait(false);
-                connection.Write(Helper.TrueArray);
-            }
-            else
-            {
-                connection.Write(Helper.FalseArray);
-            }
-        }
-
-        [MessengerId((ushort)SForwardMessengerIds.Exit)]
-        public void Exit(IConnection connection)
-        {
-            sForwardServerNodeTransfer.Exit();
-        }
-        [MessengerId((ushort)SForwardMessengerIds.ExitForward)]
-        public async Task ExitForward(IConnection connection)
-        {
-            string id = serializer.Deserialize<string>(connection.ReceiveRequestWrap.Payload.Span);
-            if (signCaching.TryGet(connection.Id, out SignCacheInfo cache) && cache.Super)
-            {
-                await sForwardServerMasterTransfer.Exit(id).ConfigureAwait(false);
-                connection.Write(Helper.TrueArray);
-            }
-            else
-            {
-                connection.Write(Helper.FalseArray);
-            }
-        }
-
-        [MessengerId((ushort)SForwardMessengerIds.Update)]
-        public void Update(IConnection connection)
-        {
-            sForwardServerNodeTransfer.Update(serializer.Deserialize<string>(connection.ReceiveRequestWrap.Payload.Span));
-        }
-        [MessengerId((ushort)SForwardMessengerIds.UpdateForward)]
-        public async Task UpdateForward(IConnection connection)
-        {
-            KeyValuePair<string, string> info = serializer.Deserialize<KeyValuePair<string, string>>(connection.ReceiveRequestWrap.Payload.Span);
-            if (signCaching.TryGet(connection.Id, out SignCacheInfo cache) && cache.Super)
-            {
-                await sForwardServerMasterTransfer.Update(info.Key, info.Value).ConfigureAwait(false);
-                connection.Write(Helper.TrueArray);
-            }
-            else
-            {
-                connection.Write(Helper.FalseArray);
-            }
-        }
-
         /// <summary>
-        /// 添加穿透
+        /// 信标服务器
         /// </summary>
         /// <param name="connection"></param>
-        [MessengerId((ushort)SForwardMessengerIds.Add)]
-        public async Task Add(IConnection connection)
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.NodeReport)]
+        public async Task NodeReport(IConnection connection)
         {
-            SForwardAddInfo sForwardAddInfo = serializer.Deserialize<SForwardAddInfo>(connection.ReceiveRequestWrap.Payload.Span);
-            SForwardAddResultInfo result = new SForwardAddResultInfo { Success = true, BufferSize = 3 };
             try
             {
-                if (signCaching.TryGet(connection.Id, out SignCacheInfo cache) == false)
+                SForwardServerNodeReportInfoOld info = serializer.Deserialize<SForwardServerNodeReportInfoOld>(connection.ReceiveRequestWrap.Payload.Span);
+                if (info.Address.Equals(IPAddress.Any) || info.Address.Equals(IPAddress.Loopback))
                 {
-                    result.Success = false;
-                    result.Message = "need sign in";
-                    return;
+                    info.Address = connection.Address.Address;
                 }
-                SForwardAddInfo191 sForwardAddInfo191 = new SForwardAddInfo191
-                {
-                    Domain = sForwardAddInfo.Domain,
-                    RemotePort = sForwardAddInfo.RemotePort,
-                    MachineId = cache.MachineId,
-                    GroupId = cache.GroupId
-                };
-                string error = await validator.Validate(cache, sForwardAddInfo191).ConfigureAwait(false);
-                if (string.IsNullOrWhiteSpace(error) == false)
-                {
-                    result.Success = false;
-                    result.Message = error;
-                    return;
-                }
-                Add(sForwardAddInfo, cache.MachineId, cache.GroupId, result, sForwardAddInfo191.Super, sForwardAddInfo191.Bandwidth);
+
+                await sForwardServerNodeReportTransfer.Report(info.Id, info.Name, info.Address.ToString()).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                result.Success = false;
-                result.Message = $"sforward fail : {ex.Message}";
-                LoggerHelper.Instance.Error(result.Message);
+                LoggerHelper.Instance.Error(ex);
             }
-            finally
-            {
-                connection.Write(serializer.Serialize(result));
-            }
-
+            connection.Write(serializer.Serialize(VersionHelper.Version));
         }
-        [MessengerId((ushort)SForwardMessengerIds.Add191)]
-        public void Add191(IConnection connection)
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.Heart)]
+        public void Heart(IConnection connection)
         {
-            SForwardAddInfo191 sForwardAddInfo = serializer.Deserialize<SForwardAddInfo191>(connection.ReceiveRequestWrap.Payload.Span);
+            List<string> ids = serializer.Deserialize<List<string>>(connection.ReceiveRequestWrap.Payload.Span);
+            connection.Write(serializer.Serialize(ids.Except(signCaching.GetOnline()).ToList()));
+        }
+
+
+        /// <summary>
+        /// 节点服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        [MessengerId((ushort)SForwardMessengerIds.Start)]
+        public void Start(IConnection connection)
+        {
+            SForwardAddInfo sForwardAddInfo = serializer.Deserialize<SForwardAddInfo>(connection.ReceiveRequestWrap.Payload.Span);
             SForwardAddResultInfo result = new SForwardAddResultInfo { Success = true, BufferSize = 3 };
             try
             {
@@ -204,10 +130,15 @@ namespace linker.plugins.sforward.messenger
             }
 
         }
-        [MessengerId((ushort)SForwardMessengerIds.AddForward191)]
-        public async Task AddForward191(IConnection connection)
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.StartForward)]
+        public async Task StartForward(IConnection connection)
         {
-            SForwardAddInfo191 sForwardAddInfo = serializer.Deserialize<SForwardAddInfo191>(connection.ReceiveRequestWrap.Payload.Span);
+            SForwardAddInfo sForwardAddInfo = serializer.Deserialize<SForwardAddInfo>(connection.ReceiveRequestWrap.Payload.Span);
             SForwardAddResultInfo result = new SForwardAddResultInfo { Success = true, BufferSize = 3 };
             try
             {
@@ -227,7 +158,7 @@ namespace linker.plugins.sforward.messenger
 
                 sForwardAddInfo.GroupId = cache.GroupId;
                 sForwardAddInfo.MachineId = cache.MachineId;
-                result = await sForwardServerMasterTransfer.Add(sForwardAddInfo, cache);
+                result = await sForwardServerMasterTransfer.Start(sForwardAddInfo, cache);
             }
             catch (Exception ex)
             {
@@ -241,50 +172,14 @@ namespace linker.plugins.sforward.messenger
             }
 
         }
-        [MessengerId((ushort)SForwardMessengerIds.Heart)]
-        public void Heart(IConnection connection)
-        {
-            List<string> ids = serializer.Deserialize<List<string>>(connection.ReceiveRequestWrap.Payload.Span);
-            connection.Write(serializer.Serialize(ids.Except(signCaching.GetOnline()).ToList()));
-        }
-        [MessengerId((ushort)SForwardMessengerIds.Hosts)]
-        public void Hosts(IConnection connection)
-        {
-            connection.Write(serializer.Serialize(signInServerStore.Hosts));
-        }
-
         /// <summary>
-        /// 删除穿透
+        /// 节点服务器
         /// </summary>
         /// <param name="connection"></param>
-        [MessengerId((ushort)SForwardMessengerIds.Remove)]
-        public void Remove(IConnection connection)
+        [MessengerId((ushort)SForwardMessengerIds.Stop)]
+        public void Stop(IConnection connection)
         {
             SForwardAddInfo sForwardAddInfo = serializer.Deserialize<SForwardAddInfo>(connection.ReceiveRequestWrap.Payload.Span);
-            SForwardAddResultInfo result = new SForwardAddResultInfo { Success = true };
-
-            try
-            {
-                if (signCaching.TryGet(connection.Id, out SignCacheInfo cache) == false)
-                {
-                    result.Success = false;
-                    result.Message = "need sign in";
-                    return;
-                }
-                Remove(sForwardAddInfo, cache.MachineId, result);
-            }
-            catch (Exception)
-            {
-            }
-            finally
-            {
-                connection.Write(serializer.Serialize(result));
-            }
-        }
-        [MessengerId((ushort)SForwardMessengerIds.Remove191)]
-        public void Remove191(IConnection connection)
-        {
-            SForwardAddInfo191 sForwardAddInfo = serializer.Deserialize<SForwardAddInfo191>(connection.ReceiveRequestWrap.Payload.Span);
             SForwardAddResultInfo result = new SForwardAddResultInfo { Success = true };
 
             try
@@ -299,10 +194,15 @@ namespace linker.plugins.sforward.messenger
                 connection.Write(serializer.Serialize(result));
             }
         }
-        [MessengerId((ushort)SForwardMessengerIds.RemoveForward191)]
-        public async Task RemoveForward191(IConnection connection)
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.StopForward)]
+        public async Task StopForward(IConnection connection)
         {
-            SForwardAddInfo191 sForwardAddInfo = serializer.Deserialize<SForwardAddInfo191>(connection.ReceiveRequestWrap.Payload.Span);
+            SForwardAddInfo sForwardAddInfo = serializer.Deserialize<SForwardAddInfo>(connection.ReceiveRequestWrap.Payload.Span);
             SForwardAddResultInfo result = new SForwardAddResultInfo { Success = true };
 
             try
@@ -315,7 +215,7 @@ namespace linker.plugins.sforward.messenger
                 }
                 sForwardAddInfo.GroupId = cache.GroupId;
                 sForwardAddInfo.MachineId = cache.MachineId;
-                result = await sForwardServerMasterTransfer.Remove(sForwardAddInfo);
+                result = await sForwardServerMasterTransfer.Stop(sForwardAddInfo);
             }
             catch (Exception)
             {
@@ -327,7 +227,7 @@ namespace linker.plugins.sforward.messenger
         }
 
 
-        public void Remove(SForwardAddInfo sForwardAddInfo, string machineId, SForwardAddResultInfo result)
+        private void Remove(SForwardAddInfo sForwardAddInfo, string machineId, SForwardAddResultInfo result)
         {
             try
             {
@@ -337,7 +237,7 @@ namespace linker.plugins.sforward.messenger
                     {
                         for (int port = min; port <= max; port++)
                         {
-                            if (sForwardServerCahing.TryRemove(port, machineId, out _))
+                            if (sForwardServerCahing.TryRemove(port, machineId, sForwardAddInfo.NodeId, out _))
                             {
                                 proxy.Stop(port);
                             }
@@ -345,7 +245,7 @@ namespace linker.plugins.sforward.messenger
                     }
                     else
                     {
-                        sForwardServerCahing.TryRemove(sForwardAddInfo.Domain, machineId, out _);
+                        sForwardServerCahing.TryRemove(sForwardAddInfo.Domain, machineId, sForwardAddInfo.NodeId, out _);
                         proxy.RemoveHttp(sForwardAddInfo.Domain);
                         result.Message = $"domain 【{sForwardAddInfo.Domain}】 remove success";
                     }
@@ -354,7 +254,7 @@ namespace linker.plugins.sforward.messenger
 
                 if (sForwardAddInfo.RemotePort > 0)
                 {
-                    sForwardServerCahing.TryRemove(sForwardAddInfo.RemotePort, machineId, out _);
+                    sForwardServerCahing.TryRemove(sForwardAddInfo.RemotePort, machineId, sForwardAddInfo.NodeId, out _);
                     proxy.Stop(sForwardAddInfo.RemotePort);
                     result.Message = $"port 【{sForwardAddInfo.RemotePort}】 remove success";
                     return;
@@ -366,11 +266,11 @@ namespace linker.plugins.sforward.messenger
                 result.Message = $"sforward fail : {ex.Message}";
             }
         }
-        public void Remove(SForwardAddInfo191 sForwardAddInfo, SForwardAddResultInfo result)
+        private void Remove(SForwardAddInfo sForwardAddInfo, SForwardAddResultInfo result)
         {
-            Remove((SForwardAddInfo)sForwardAddInfo, sForwardAddInfo.MachineId, result);
+            Remove(sForwardAddInfo, sForwardAddInfo.MachineId, result);
         }
-        public void Add(SForwardAddInfo sForwardAddInfo, string machineId, string groupid, SForwardAddResultInfo result, bool super, double bandwidth)
+        private void Add(SForwardAddInfo sForwardAddInfo, string machineId, string groupid, SForwardAddResultInfo result, bool super, double bandwidth)
         {
             try
             {
@@ -382,7 +282,7 @@ namespace linker.plugins.sforward.messenger
                     {
                         for (int port = min; port <= max; port++)
                         {
-                            if (sForwardServerCahing.TryAdd(port, machineId))
+                            if (sForwardServerCahing.TryAdd(port, machineId, sForwardAddInfo.NodeId))
                             {
                                 proxy.Stop(port);
                                 result.Message = proxy.Start(port, 3, groupid, super, bandwidth);
@@ -396,7 +296,7 @@ namespace linker.plugins.sforward.messenger
                     }
                     else
                     {
-                        if (sForwardServerCahing.TryAdd(sForwardAddInfo.Domain, machineId) == false)
+                        if (sForwardServerCahing.TryAdd(sForwardAddInfo.Domain, machineId, sForwardAddInfo.NodeId) == false)
                         {
                             result.Success = false;
                             result.Message = $"domain 【{sForwardAddInfo.Domain}】 already exists";
@@ -414,7 +314,7 @@ namespace linker.plugins.sforward.messenger
                 //如果是端口
                 if (sForwardAddInfo.RemotePort > 0)
                 {
-                    if (sForwardServerCahing.TryAdd(sForwardAddInfo.RemotePort, machineId) == false)
+                    if (sForwardServerCahing.TryAdd(sForwardAddInfo.RemotePort, machineId, sForwardAddInfo.NodeId) == false)
                     {
 
                         result.Success = false;
@@ -446,9 +346,9 @@ namespace linker.plugins.sforward.messenger
                 result.Message = $"sforward fail : {ex.Message}";
             }
         }
-        public void Add(SForwardAddInfo191 sForwardAddInfo, SForwardAddResultInfo result)
+        private void Add(SForwardAddInfo sForwardAddInfo, SForwardAddResultInfo result)
         {
-            Add((SForwardAddInfo)sForwardAddInfo, sForwardAddInfo.MachineId, sForwardAddInfo.GroupId, result, sForwardAddInfo.Super, sForwardAddInfo.Bandwidth);
+            Add(sForwardAddInfo, sForwardAddInfo.MachineId, sForwardAddInfo.GroupId, result, sForwardAddInfo.Super, sForwardAddInfo.Bandwidth);
         }
         private static bool PortRange(string str, out int min, out int max)
         {
@@ -459,9 +359,10 @@ namespace linker.plugins.sforward.messenger
 
 
         /// <summary>
-        /// 获取对端的穿透记录
+        /// 信标服务器
         /// </summary>
         /// <param name="connection"></param>
+        /// <returns></returns>
         [MessengerId((ushort)SForwardMessengerIds.GetForward)]
         public void GetForward(IConnection connection)
         {
@@ -490,9 +391,10 @@ namespace linker.plugins.sforward.messenger
             }
         }
         /// <summary>
-        /// 添加对端的穿透记录
+        /// 信标服务器
         /// </summary>
         /// <param name="connection"></param>
+        /// <returns></returns>
         [MessengerId((ushort)SForwardMessengerIds.AddClientForward)]
         public async Task AddClientForward(IConnection connection)
         {
@@ -520,38 +422,11 @@ namespace linker.plugins.sforward.messenger
                 }).ConfigureAwait(false);
             }
         }
-        [MessengerId((ushort)SForwardMessengerIds.AddClientForward191)]
-        public async Task AddClientForward191(IConnection connection)
-        {
-            SForwardAddForwardInfo191 info = serializer.Deserialize<SForwardAddForwardInfo191>(connection.ReceiveRequestWrap.Payload.Span);
-            if (signCaching.TryGet(connection.Id, info.MachineId, out SignCacheInfo from, out SignCacheInfo to))
-            {
-                uint requestid = connection.ReceiveRequestWrap.RequestId;
-                await sender.SendReply(new MessageRequestWrap
-                {
-                    Connection = to.Connection,
-                    MessengerId = (ushort)SForwardMessengerIds.AddClient191,
-                    Payload = serializer.Serialize(info.Data)
-                }).ContinueWith(async (result) =>
-                {
-                    if (result.Result.Code == MessageResponeCodes.OK)
-                    {
-                        await sender.ReplyOnly(new MessageResponseWrap
-                        {
-                            Connection = connection,
-                            Code = MessageResponeCodes.OK,
-                            Payload = result.Result.Data,
-                            RequestId = requestid
-                        }, (ushort)SForwardMessengerIds.AddClientForward191).ConfigureAwait(false);
-                    }
-                }).ConfigureAwait(false);
-            }
-        }
-
         /// <summary>
-        /// 删除对端的穿透记录
+        /// 信标服务器
         /// </summary>
         /// <param name="connection"></param>
+        /// <returns></returns>
         [MessengerId((ushort)SForwardMessengerIds.RemoveClientForward)]
         public async Task RemoveClientForward(IConnection connection)
         {
@@ -579,7 +454,11 @@ namespace linker.plugins.sforward.messenger
                 }).ConfigureAwait(false);
             }
         }
-
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
         [MessengerId((ushort)SForwardMessengerIds.StartClientForward)]
         public async Task StartClientForward(IConnection connection)
         {
@@ -594,6 +473,11 @@ namespace linker.plugins.sforward.messenger
                 }).ConfigureAwait(false);
             }
         }
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
         [MessengerId((ushort)SForwardMessengerIds.StopClientForward)]
         public async Task StopClientForward(IConnection connection)
         {
@@ -608,11 +492,11 @@ namespace linker.plugins.sforward.messenger
                 }).ConfigureAwait(false);
             }
         }
-
         /// <summary>
-        /// 测试对端的穿透记录
+        /// 信标服务器
         /// </summary>
         /// <param name="connection"></param>
+        /// <returns></returns>
         [MessengerId((ushort)SForwardMessengerIds.TestClientForward)]
         public async Task TestClientForward(IConnection connection)
         {
@@ -628,96 +512,390 @@ namespace linker.plugins.sforward.messenger
             }
         }
 
-
         /// <summary>
-        /// 来自节点的连接
+        /// 信标服务器
         /// </summary>
         /// <param name="connection"></param>
         /// <returns></returns>
-        [MessengerId((ushort)SForwardMessengerIds.ProxyNode)]
-        public async Task ProxyNode(IConnection connection)
+        [MessengerId((ushort)SForwardMessengerIds.SignIn)]
+        public async Task SignIn(IConnection connection)
         {
-            SForwardProxyInfo info = serializer.Deserialize<SForwardProxyInfo>(connection.ReceiveRequestWrap.Payload.Span);
-
-            if (sForwardServerMasterTransfer.GetNode(info.NodeId, out var node) && string.IsNullOrWhiteSpace(info.MachineId) == false && signCaching.TryGet(info.MachineId, out SignCacheInfo sign) && sign.Connected)
+            ValueTuple<string, string, string> kv = serializer.Deserialize<ValueTuple<string, string, string>>(connection.ReceiveRequestWrap.Payload.Span);
+            if (await sForwardServerNodeReportTransfer.SignIn(kv.Item1, kv.Item2, kv.Item3, connection).ConfigureAwait(false))
             {
-                info.Addr = node.Address;
-                await sender.SendOnly(new MessageRequestWrap
-                {
-                    Connection = sign.Connection,
-                    MessengerId = (ushort)SForwardMessengerIds.Proxy,
-                    Payload = serializer.Serialize(info)
-                }).ConfigureAwait(false);
+                connection.Write(Helper.TrueArray);
+            }
+            else
+            {
+                connection.Write(Helper.FalseArray);
             }
         }
         /// <summary>
-        /// 服务器收到http连接
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.Report)]
+        public async Task Report(IConnection connection)
+        {
+            SForwardServerNodeReportInfo info = serializer.Deserialize<SForwardServerNodeReportInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            await sForwardServerNodeReportTransfer.Report(connection, info).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.ShareForward)]
+        public async Task ShareForward(IConnection connection)
+        {
+            string id = serializer.Deserialize<string>(connection.ReceiveRequestWrap.Payload.Span);
+            if (signCaching.TryGet(connection.Id, out SignCacheInfo from) == false || from.Super == false)
+            {
+                connection.Write(serializer.Serialize("need super key"));
+                return;
+            }
+            connection.Write(serializer.Serialize(await sForwardServerNodeReportTransfer.GetShareKeyForward(id)));
+        }
+        /// <summary>
+        /// 节点服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.Share)]
+        public async Task Share(IConnection connection)
+        {
+            connection.Write(serializer.Serialize(await sForwardServerNodeReportTransfer.GetShareKey(connection)));
+        }
+
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.Import)]
+        public async Task Import(IConnection connection)
+        {
+            string sharekey = serializer.Deserialize<string>(connection.ReceiveRequestWrap.Payload.Span);
+
+            if (signCaching.TryGet(connection.Id, out SignCacheInfo from) == false || from.Super == false)
+            {
+                connection.Write(serializer.Serialize("need super key"));
+                return;
+            }
+
+            string result = await sForwardServerNodeReportTransfer.Import(sharekey).ConfigureAwait(false);
+            connection.Write(serializer.Serialize(result));
+        }
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.Remove)]
+        public async Task Remove(IConnection connection)
+        {
+            string id = serializer.Deserialize<string>(connection.ReceiveRequestWrap.Payload.Span);
+            if (signCaching.TryGet(connection.Id, out SignCacheInfo from) == false || from.Super == false)
+            {
+                connection.Write(serializer.Serialize("need super key"));
+                return;
+            }
+
+            bool result = await sForwardServerNodeReportTransfer.Remove(id).ConfigureAwait(false);
+            connection.Write(serializer.Serialize(result ? string.Empty : "remove fail"));
+        }
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.UpdateForward)]
+        public async Task UpdateForward(IConnection connection)
+        {
+            SForwardServerNodeStoreInfo info = serializer.Deserialize<SForwardServerNodeStoreInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            if (signCaching.TryGet(connection.Id, out SignCacheInfo from) == false || from.Super == false)
+            {
+                connection.Write(Helper.FalseArray);
+                return;
+            }
+
+            bool result = await sForwardServerNodeReportTransfer.UpdateForward(info).ConfigureAwait(false);
+            connection.Write(result ? Helper.TrueArray : Helper.FalseArray);
+        }
+        /// <summary>
+        /// 节点服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.Update)]
+        public async Task Update(IConnection connection)
+        {
+            SForwardServerNodeStoreInfo info = serializer.Deserialize<SForwardServerNodeStoreInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            await sForwardServerNodeReportTransfer.Update(connection, info).ConfigureAwait(false);
+        }
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+
+        [MessengerId((ushort)SForwardMessengerIds.UpgradeForward)]
+        public async Task UpgradeForward(IConnection connection)
+        {
+            KeyValuePair<string, string> info = serializer.Deserialize<KeyValuePair<string, string>>(connection.ReceiveRequestWrap.Payload.Span);
+            if (signCaching.TryGet(connection.Id, out SignCacheInfo from) == false || from.Super == false)
+            {
+                connection.Write(Helper.FalseArray);
+                return;
+            }
+
+            bool result = await sForwardServerNodeReportTransfer.UpgradeForward(info.Key, info.Value).ConfigureAwait(false);
+            connection.Write(result ? Helper.TrueArray : Helper.FalseArray);
+        }
+        /// <summary>
+        /// 节点服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.Upgrade)]
+        public async Task Upgrade(IConnection connection)
+        {
+            string version = serializer.Deserialize<string>(connection.ReceiveRequestWrap.Payload.Span);
+            await sForwardServerNodeReportTransfer.Upgrade(connection, version).ConfigureAwait(false);
+        }
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+
+        [MessengerId((ushort)SForwardMessengerIds.ExitForward)]
+        public async Task ExitForward(IConnection connection)
+        {
+            string nodeid = serializer.Deserialize<string>(connection.ReceiveRequestWrap.Payload.Span);
+            if (signCaching.TryGet(connection.Id, out SignCacheInfo from) == false || from.Super == false)
+            {
+                connection.Write(Helper.FalseArray);
+                return;
+            }
+
+            bool result = await sForwardServerNodeReportTransfer.ExitForward(nodeid).ConfigureAwait(false);
+            connection.Write(result ? Helper.TrueArray : Helper.FalseArray);
+        }
+        /// <summary>
+        /// 节点服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.Exit)]
+        public async Task Exit(IConnection connection)
+        {
+            await sForwardServerNodeReportTransfer.Exit(connection).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.MastersForward)]
+        public async Task MastersForward(IConnection connection)
+        {
+            MastersRequestInfo info = serializer.Deserialize<MastersRequestInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            if (signCaching.TryGet(connection.Id, out SignCacheInfo from) == false || from.Super == false)
+            {
+                connection.Write(serializer.Serialize(new MastersResponseInfo()));
+                return;
+            }
+
+            MastersResponseInfo resp = await sForwardServerNodeReportTransfer.MastersForward(info).ConfigureAwait(false);
+            connection.Write(serializer.Serialize(resp));
+        }
+        /// <summary>
+        /// 节点服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.Masters)]
+        public async Task Masters(IConnection connection)
+        {
+            MastersRequestInfo info = serializer.Deserialize<MastersRequestInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            MastersResponseInfo resp = await sForwardServerNodeReportTransfer.Masters(connection,info).ConfigureAwait(false);
+            connection.Write(serializer.Serialize(resp));
+        }
+
+        /// <summary>
+        /// 信标服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.DenysForward)]
+        public async Task DenysForward(IConnection connection)
+        {
+            MasterDenyStoreRequestInfo info = serializer.Deserialize<MasterDenyStoreRequestInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            if (signCaching.TryGet(connection.Id, out SignCacheInfo from) == false || from.Super == false)
+            {
+                connection.Write(serializer.Serialize(new MasterDenyStoreResponseInfo()));
+                return;
+            }
+
+            MasterDenyStoreResponseInfo resp = await sForwardServerNodeReportTransfer.DenysForward(info).ConfigureAwait(false);
+            connection.Write(serializer.Serialize(resp));
+        }
+        /// <summary>
+        /// 节点服务器
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.Denys)]
+        public async Task Denys(IConnection connection)
+        {
+            MasterDenyStoreRequestInfo info = serializer.Deserialize<MasterDenyStoreRequestInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            MasterDenyStoreResponseInfo resp = await sForwardServerNodeReportTransfer.Denys(connection,info).ConfigureAwait(false);
+            connection.Write(serializer.Serialize(resp));
+        }
+        public async Task DenysAddForward(IConnection connection)
+        {
+            MasterDenyAddInfo info = serializer.Deserialize<MasterDenyAddInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            if (signCaching.TryGet(connection.Id, out SignCacheInfo from) == false || from.Super == false)
+            {
+                connection.Write(Helper.FalseArray);
+                return;
+            }
+
+            bool resp = await sForwardServerNodeReportTransfer.DenysAddForward(info).ConfigureAwait(false);
+            connection.Write(resp ? Helper.TrueArray : Helper.FalseArray);
+        }
+        [MessengerId((ushort)SForwardMessengerIds.DenysAdd)]
+        public async Task DenysAdd(IConnection connection)
+        {
+            MasterDenyAddInfo info = serializer.Deserialize<MasterDenyAddInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            bool resp = await sForwardServerNodeReportTransfer.DenysAdd(connection, info).ConfigureAwait(false);
+            connection.Write(resp ? Helper.TrueArray : Helper.FalseArray);
+        }
+        [MessengerId((ushort)SForwardMessengerIds.DenysDelForward)]
+        public async Task DenysDelForward(IConnection connection)
+        {
+            MasterDenyDelInfo info = serializer.Deserialize<MasterDenyDelInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            if (signCaching.TryGet(connection.Id, out SignCacheInfo from) == false || from.Super == false)
+            {
+                connection.Write(Helper.FalseArray);
+                return;
+            }
+
+            bool resp = await sForwardServerNodeReportTransfer.DenysDelForward(info).ConfigureAwait(false);
+            connection.Write(resp ? Helper.TrueArray : Helper.FalseArray);
+        }
+        [MessengerId((ushort)SForwardMessengerIds.DenysDel)]
+        public async Task DenysDel(IConnection connection)
+        {
+            MasterDenyDelInfo info = serializer.Deserialize<MasterDenyDelInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            bool resp = await sForwardServerNodeReportTransfer.DenysDel(connection, info).ConfigureAwait(false);
+            connection.Write(resp ? Helper.TrueArray : Helper.FalseArray);
+        }
+
+
+
+        /// <summary>
+        /// 信标服务器收到来自节点的连接
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)SForwardMessengerIds.ProxyForward)]
+        public async Task ProxyNode(IConnection connection)
+        {
+            SForwardProxyInfo info = serializer.Deserialize<SForwardProxyInfo>(connection.ReceiveRequestWrap.Payload.Span);
+            var node = await sForwardServerNodeReportTransfer.GetNode(info.NodeId).ConfigureAwait(false);
+            if (node == null || string.IsNullOrWhiteSpace(info.MachineId))
+            {
+                return;
+            }
+            if (signCaching.TryGet(info.MachineId, out SignCacheInfo sign) == false || sign.Connected == false)
+            {
+                return;
+            }
+
+            info.Addr = connection.Address.Address;
+            await sender.SendOnly(new MessageRequestWrap
+            {
+                Connection = sign.Connection,
+                MessengerId = (ushort)SForwardMessengerIds.Proxy,
+                Payload = serializer.Serialize(info)
+            }).ConfigureAwait(false);
+        }
+        /// <summary>
+        /// 节点服务器收到http连接
         /// </summary>
         /// <param name="host"></param>
         /// <param name="port"></param>
         /// <param name="id"></param>
         /// <returns></returns>
-        private async Task<bool> WebConnect(string host, int port, ulong id)
+        private async Task<string> WebConnect(string host, int port, ulong id)
         {
-            if (sForwardServerCahing.TryGet(host, out string machineId) == false)
+            if (sForwardServerCahing.TryGet(host, out string machineId, out string nodeid) == false)
             {
-                if (string.IsNullOrWhiteSpace(sForwardServerNodeTransfer.Node.Domain))
+                if (string.IsNullOrWhiteSpace(sForwardServerNodeReportTransfer.Config.Domain))
                 {
-                    return false;
+                    return "Node domain not found";
                 }
-                host = host.Substring(0, host.Length - sForwardServerNodeTransfer.Node.Domain.Length - 1);
-                if (sForwardServerCahing.TryGet(host, out machineId) == false)
+                host = host.Substring(0, host.Length - sForwardServerNodeReportTransfer.Config.Domain.Length - 1);
+                if (sForwardServerCahing.TryGet(host, out machineId, out nodeid) == false)
                 {
-                    return false;
+                    return "Host to machine not found";
                 }
             }
 
 
-            return await sForwardServerNodeTransfer.ProxyNode(new SForwardProxyInfo
+            bool result = await sForwardServerNodeTransfer.ProxyNode(new SForwardProxyInfo
             {
                 Domain = host,
                 RemotePort = port,
                 Id = id,
                 BufferSize = 3,
-                NodeId = sForwardServerNodeTransfer.Node.Id,
+                NodeId = nodeid,
                 ProtocolType = ProtocolType.Tcp,
                 MachineId = machineId,
             });
+            return result ? string.Empty : "Proxy node fail";
         }
         /// <summary>
-        /// 服务器收到tcp连接
+        /// 节点服务器收到tcp连接
         /// </summary>
         /// <param name="port"></param>
         /// <param name="id"></param>
         /// <returns></returns>
-        private async Task<bool> TunnelConnect(int port, ulong id)
+        private async Task<string> TunnelConnect(int port, ulong id)
         {
-            sForwardServerCahing.TryGet(port, out string machineId);
-            return await sForwardServerNodeTransfer.ProxyNode(new SForwardProxyInfo
+            sForwardServerCahing.TryGet(port, out string machineId, out string nodeid);
+
+            bool result = await sForwardServerNodeTransfer.ProxyNode(new SForwardProxyInfo
             {
                 RemotePort = port,
                 Id = id,
                 BufferSize = 3,
-                NodeId = sForwardServerNodeTransfer.Node.Id,
+                NodeId = nodeid,
                 ProtocolType = ProtocolType.Tcp,
                 MachineId = machineId,
             });
+            return result ? string.Empty : "Proxy node fail";
         }
         /// <summary>
-        /// 服务器收到udp数据
+        /// 节点服务器收到udp数据
         /// </summary>
         /// <param name="port"></param>
         /// <param name="id"></param>
         /// <returns></returns>
         private async Task<bool> UdpConnect(int port, ulong id)
         {
-            sForwardServerCahing.TryGet(port, out string machineId);
+            sForwardServerCahing.TryGet(port, out string machineId, out string nodeid);
             return await sForwardServerNodeTransfer.ProxyNode(new SForwardProxyInfo
             {
                 RemotePort = port,
                 Id = id,
                 BufferSize = 3,
-                NodeId = sForwardServerNodeTransfer.Node.Id,
+                NodeId = nodeid,
                 ProtocolType = ProtocolType.Udp,
                 MachineId = machineId
             });
@@ -728,28 +906,33 @@ namespace linker.plugins.sforward.messenger
         {
             TimerHelper.SetIntervalLong(async () =>
             {
-                var ids = sForwardServerCahing.GetMachineIds();
-                if (ids.Count > 0)
-                {
-                    var offIds = await sForwardServerNodeTransfer.Heart(ids);
+                var dic = sForwardServerCahing.GetMachineIds();
+                if (dic.Count == 0) return;
 
-                    if (sForwardServerCahing.TryGet(offIds, out List<string> domains, out List<int> ports))
+                foreach (var kv in dic)
+                {
+                    if (kv.Value.Count == 0) continue;
+
+                    var offIds = await sForwardServerNodeTransfer.Heart(kv.Value, kv.Key);
+                    if (offIds.Count == 0 || sForwardServerCahing.TryGet(offIds, out List<string> domains, out List<int> ports) == false)
                     {
-                        if (domains.Count != 0)
+                        continue;
+                    }
+
+                    if (domains.Count != 0)
+                    {
+                        foreach (var domain in domains)
                         {
-                            foreach (var domain in domains)
-                            {
-                                sForwardServerCahing.TryRemove(domain, out _);
-                                proxy.RemoveHttp(domain);
-                            }
+                            sForwardServerCahing.TryRemove(domain, kv.Key, out _);
+                            proxy.RemoveHttp(domain);
                         }
-                        if (ports.Count != 0)
+                    }
+                    if (ports.Count != 0)
+                    {
+                        foreach (var port in ports)
                         {
-                            foreach (var port in ports)
-                            {
-                                sForwardServerCahing.TryRemove(port, out _);
-                                proxy.Stop(port);
-                            }
+                            sForwardServerCahing.TryRemove(port, kv.Key, out _);
+                            proxy.Stop(port);
                         }
                     }
                 }
@@ -782,24 +965,18 @@ namespace linker.plugins.sforward.messenger
         [MessengerId((ushort)SForwardMessengerIds.Get)]
         public void Get(IConnection connection)
         {
-            List<SForwardInfo191> result = sForwardClientStore.Get().ToList();
+            List<SForwardInfo> result = sForwardClientStore.Get().ToList();
             connection.Write(serializer.Serialize(result));
         }
         /// <summary>
         /// 添加
         /// </summary>
         /// <param name="connection"></param>
+
         [MessengerId((ushort)SForwardMessengerIds.AddClient)]
         public void AddClient(IConnection connection)
         {
-            SForwardInfo191 sForwardInfo = serializer.Deserialize<SForwardInfo191>(connection.ReceiveRequestWrap.Payload.Span);
-            sForwardTransfer.Add(sForwardInfo);
-            connection.Write(Helper.TrueArray);
-        }
-        [MessengerId((ushort)SForwardMessengerIds.AddClient191)]
-        public void AddClient191(IConnection connection)
-        {
-            SForwardInfo191 sForwardInfo = serializer.Deserialize<SForwardInfo191>(connection.ReceiveRequestWrap.Payload.Span);
+            SForwardInfo sForwardInfo = serializer.Deserialize<SForwardInfo>(connection.ReceiveRequestWrap.Payload.Span);
             sForwardTransfer.Add(sForwardInfo);
             connection.Write(Helper.TrueArray);
         }
@@ -846,8 +1023,7 @@ namespace linker.plugins.sforward.messenger
         public void Proxy(IConnection connection)
         {
             SForwardProxyInfo info = serializer.Deserialize<SForwardProxyInfo>(connection.ReceiveRequestWrap.Payload.Span);
-            IPEndPoint server = new IPEndPoint(IPAddress.Any.Equals(info.Addr) ? connection.Address.Address : info.Addr, info.RemotePort);
-
+            IPEndPoint server = new IPEndPoint(IPAddress.Any.Equals(info.Addr) || IPAddress.Loopback.Equals(info.Addr) ? connection.Address.Address : info.Addr, info.RemotePort);
             //是http
             if (string.IsNullOrWhiteSpace(info.Domain) == false)
             {

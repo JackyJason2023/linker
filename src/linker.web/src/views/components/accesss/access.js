@@ -4,33 +4,40 @@ import { inject, provide, ref } from "vue";
 const accessSymbol = Symbol();
 export const provideAccess = () => {
     const access = ref({
-        list: {},
+        list: null,
         timer: 0,
         hashcode: 0
     });
     provide(accessSymbol, access);
 
-    const handleAccesssRefresh = () => {
+    const accessRefreshFn = () => {
         refreshAccess();
     }
-    const _getAccessInfo = () => {
-        clearTimeout(access.value.timer);
-        getAccesss(access.value.hashcode.toString()).then((res) => {
-            access.value.hashcode = res.HashCode;
-            if (res.List) {
-                access.value.list = res.List;
-            }
-            access.value.timer = setTimeout(_getAccessInfo, 1000);
-        }).catch(() => {
-            access.value.timer = setTimeout(_getAccessInfo, 1000);
+    const accessDataFn = () => {
+        return new Promise((resolve, reject) => { 
+            getAccesss(access.value.hashcode.toString()).then((res) => {
+                access.value.hashcode = res.HashCode;
+                if (res.List) {
+                    access.value.list = res.List;
+                    resolve(true);
+                    return;
+                }
+                resolve(false);
+            }).catch(() => {
+                resolve(false);
+            });
         });
     }
-    const clearAccessTimeout = () => {
-        clearTimeout(access.value.timer);
+    const accessProcessFn = (device,json) => {
+        if(!access.value.list) return;
+        Object.assign(json,{
+            hook_accesss: access.value.list[device.MachineId] || '',
+            hook_accesss_load:true
+        })
     }
 
     return {
-        access, _getAccessInfo, clearAccessTimeout, handleAccesssRefresh
+        access, accessDataFn,accessProcessFn, accessRefreshFn
     }
 }
 export const useAccess = () => {

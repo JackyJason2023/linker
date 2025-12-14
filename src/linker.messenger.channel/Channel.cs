@@ -1,42 +1,93 @@
 ﻿using linker.libs;
 using linker.libs.extends;
+using linker.libs.timer;
+using linker.messenger.pcp;
+using linker.messenger.signin;
 using linker.tunnel;
 using linker.tunnel.connection;
 using System.Collections.Concurrent;
-using linker.messenger.relay.client;
-using linker.messenger.pcp;
-using linker.messenger.signin;
-using linker.libs.timer;
-using System.Net;
 
 namespace linker.messenger.channel
 {
-    public class Channel
+    public sealed class ChannelConnectionCaching
     {
         public VersionManager Version { get; } = new VersionManager();
+        public ConcurrentDictionary<string, ConcurrentDictionary<string, ITunnelConnection>> Connections { get; } = new();
+
+        public ConcurrentDictionary<string, ITunnelConnection> this[string transactionId]
+        {
+            get
+            {
+                if (Connections.TryGetValue(transactionId, out ConcurrentDictionary<string, ITunnelConnection> _connections) == false)
+                {
+                    _connections = new ConcurrentDictionary<string, ITunnelConnection>();
+                    Connections.TryAdd(transactionId, _connections);
+                }
+                return _connections;
+            }
+        }
+
+        public bool TryGetValue(string machineId, string transactionId, out ITunnelConnection connection)
+        {
+            connection = null;
+            if (Connections.TryGetValue(transactionId, out ConcurrentDictionary<string, ITunnelConnection> _connections))
+            {
+                return _connections.TryGetValue(machineId, out connection);
+            }
+            return false;
+        }
+        public void Add(ITunnelConnection connection)
+        {
+            if (Connections.TryGetValue(connection.TransactionId, out ConcurrentDictionary<string, ITunnelConnection> _connections) == false)
+            {
+                _connections = new ConcurrentDictionary<string, ITunnelConnection>();
+                Connections.TryAdd(connection.TransactionId, _connections);
+            }
+            _connections.AddOrUpdate(connection.RemoteMachineId, connection, (a, b) => connection);
+            Version.Increment();
+        }
+        public void Remove(string machineId, string transactionId)
+        {
+            if (Connections.TryGetValue(transactionId, out ConcurrentDictionary<string, ITunnelConnection> _connections))
+            {
+                if (_connections.TryRemove(machineId, out ITunnelConnection _connection))
+                {
+                    try
+                    {
+                        _connection.Dispose();
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    Version.Increment();
+                }
+            }
+        }
+    }
+    public class Channel
+    {
+        public VersionManager Version => channelConnectionCaching.Version;
+        public ConcurrentDictionary<string, ITunnelConnection> Connections => channelConnectionCaching[TransactionId];
+
         protected virtual string TransactionId { get; }
-        protected readonly ConcurrentDictionary<string, ITunnelConnection> connections = new ConcurrentDictionary<string, ITunnelConnection>();
 
         private readonly TunnelTransfer tunnelTransfer;
-        private readonly RelayClientTransfer relayTransfer;
         private readonly PcpTransfer pcpTransfer;
         private readonly SignInClientTransfer signInClientTransfer;
         private readonly ISignInClientStore signInClientStore;
-        private readonly IRelayClientStore relayClientStore;
+        private readonly ChannelConnectionCaching channelConnectionCaching;
 
-        public Channel(TunnelTransfer tunnelTransfer, RelayClientTransfer relayTransfer, PcpTransfer pcpTransfer, SignInClientTransfer signInClientTransfer, ISignInClientStore signInClientStore, IRelayClientStore relayClientStore)
+        public Channel(TunnelTransfer tunnelTransfer, PcpTransfer pcpTransfer,
+            SignInClientTransfer signInClientTransfer, ISignInClientStore signInClientStore, ChannelConnectionCaching channelConnectionCaching)
         {
             this.tunnelTransfer = tunnelTransfer;
-            this.relayTransfer = relayTransfer;
             this.pcpTransfer = pcpTransfer;
             this.signInClientTransfer = signInClientTransfer;
             this.signInClientStore = signInClientStore;
-            this.relayClientStore = relayClientStore;
+            this.channelConnectionCaching = channelConnectionCaching;
 
             //监听打洞成功
             tunnelTransfer.SetConnectedCallback(TransactionId, OnConnected);
-            //监听中继成功
-            relayTransfer.SetConnectedCallback(TransactionId, OnConnected);
             //监听节点中继成功回调
             pcpTransfer.SetConnectedCallback(TransactionId, OnConnected);
 
@@ -54,15 +105,11 @@ namespace linker.messenger.channel
             if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                 LoggerHelper.Instance.Warning($"{TransactionId} add connection {connection.GetHashCode()} {connection.ToJson()}");
 
-            if (connections.TryGetValue(connection.RemoteMachineId, out ITunnelConnection connectionOld) && connection.Equals(connectionOld) == false)
+            if (channelConnectionCaching.TryGetValue(connection.RemoteMachineId, TransactionId, out ITunnelConnection connectionOld) && connection.Equals(connectionOld) == false)
             {
-                connections.AddOrUpdate(connection.RemoteMachineId, connection, (a, b) => connection);
                 TimerHelper.SetTimeout(connectionOld.Dispose, 5000);
             }
-            else
-            {
-                connections.AddOrUpdate(connection.RemoteMachineId, connection, (a, b) => connection);
-            }
+            channelConnectionCaching.Add(connection);
             Version.Increment();
 
             Connected(connection);
@@ -86,7 +133,7 @@ namespace linker.messenger.channel
                 return null;
             }
             //之前这个客户端已经连接过
-            if (connections.TryGetValue(machineId, out ITunnelConnection connection) && connection.Connected)
+            if (channelConnectionCaching.TryGetValue(machineId, TransactionId, out ITunnelConnection connection) && connection.Connected)
             {
                 return connection;
             }
@@ -99,7 +146,7 @@ namespace linker.messenger.channel
                 }
 
                 //获得锁再次看看之前有没有连接成功
-                if (connections.TryGetValue(machineId, out connection) && connection.Connected)
+                if (channelConnectionCaching.TryGetValue(machineId, TransactionId, out connection) && connection.Connected)
                 {
                     return connection;
                 }
@@ -113,9 +160,8 @@ namespace linker.messenger.channel
 
                 if (connection != null)
                 {
-                    connections.AddOrUpdate(machineId, connection, (a, b) => connection);
+                    channelConnectionCaching.Add(connection);
                 }
-
             }
             catch (Exception)
             {
@@ -129,83 +175,30 @@ namespace linker.messenger.channel
         }
         private async Task<ITunnelConnection> RelayAndP2P(string machineId, TunnelProtocolType denyProtocols)
         {
-            //中继
-            if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG) LoggerHelper.Instance.Debug($"{TransactionId} relay to {machineId}");
-            ITunnelConnection connection = await relayTransfer.ConnectAsync(signInClientStore.Id, machineId, TransactionId, denyProtocols).ConfigureAwait(false);
-            if (connection != null)
-            {
-                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG) LoggerHelper.Instance.Debug($"{TransactionId} relay success,{connection.ToString()}");
-            }
-
+            ITunnelConnection connection = null;
             //正在后台打洞
-            if (tunnelTransfer.IsBackground(machineId, TransactionId))
+            if (tunnelTransfer.IsBackground(machineId, TransactionId) == false)
             {
-                return connection;
+                //隧道连接
+                connection = await tunnelTransfer.ConnectAsync(machineId, TransactionId, denyProtocols).ConfigureAwait(false);
+                if (connection == null || connection.Type == TunnelType.Relay)
+                {
+                    //后台打洞
+                    tunnelTransfer.StartBackground(machineId, TransactionId, denyProtocols, () =>
+                    {
+                        return channelConnectionCaching.TryGetValue(machineId, TransactionId, out ITunnelConnection connection)
+                        && connection.Connected
+                        && connection.Type != TunnelType.Relay;
+
+                    }, async (_connection) =>
+                    {
+                        await Task.CompletedTask;
+                    }, 3, 10000);
+                }
             }
 
-            if (connection != null)
-            {
-                //后台打洞
-                tunnelTransfer.StartBackground(machineId, TransactionId, denyProtocols, () =>
-                {
-                    return connections.TryGetValue(machineId, out ITunnelConnection connection) && connection.Connected && connection.Type == TunnelType.P2P;
-                }, async (_connection) =>
-                {
-                    //后台打洞失败，pcp
-                    if (_connection == null)
-                    {
-                        await pcpTransfer.ConnectAsync(machineId, TransactionId, denyProtocols).ConfigureAwait(false);
-                    }
-                }, 3, 10000);
-            }
-            else
-            {
-                //打洞
-                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG) LoggerHelper.Instance.Debug($"{TransactionId} p2p to {machineId}");
-                connection = await tunnelTransfer.ConnectAsync(machineId, TransactionId, denyProtocols).ConfigureAwait(false);
-                if (connection != null)
-                {
-                    if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG) LoggerHelper.Instance.Debug($"{TransactionId} p2p success,{connection.ToString()}");
-                }
-                if (connection == null)
-                {
-                    //pcp
-                    if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG) LoggerHelper.Instance.Debug($"{TransactionId} pcp to {machineId}");
-                    connection = await pcpTransfer.ConnectAsync(machineId, TransactionId, denyProtocols).ConfigureAwait(false);
-                }
-                if (connection != null)
-                {
-                    if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG) LoggerHelper.Instance.Debug($"{TransactionId} pcp success,{connection.ToString()}");
-                }
-            }
             return connection;
         }
 
-        /// <summary>
-        /// 获取隧道
-        /// </summary>
-        /// <returns></returns>
-        public ConcurrentDictionary<string, ITunnelConnection> GetConnections()
-        {
-            return connections;
-        }
-        /// <summary>
-        /// 删除隧道
-        /// </summary>
-        /// <param name="machineId"></param>
-        public void RemoveConnection(string machineId)
-        {
-            if (connections.TryRemove(machineId, out ITunnelConnection _connection))
-            {
-                try
-                {
-                    _connection.Dispose();
-                }
-                catch (Exception)
-                {
-                }
-                Version.Increment();
-            }
-        }
     }
 }

@@ -1,55 +1,74 @@
 ﻿using linker.messenger.sforward.server;
+using LiteDB;
 
 namespace linker.messenger.store.file.sforward
 {
-    public sealed class SForwardServerNodeStore : ISForwardServerNodeStore
+    public sealed class SForwardServerNodeStore : ISForwardNodeStore
     {
-        public int ServicePort => config.Data.Server.ServicePort;
-        public SForwardServerNodeInfo Node => config.Data.Server.SForward.Distributed.Node;
-
-        private readonly FileConfig config;
-        public SForwardServerNodeStore(FileConfig config)
+        private readonly ILiteCollection<SForwardServerNodeStoreInfo> liteCollection;
+        public SForwardServerNodeStore(Storefactory storefactory)
         {
-            this.config = config;
+            liteCollection = storefactory.GetCollection<SForwardServerNodeStoreInfo>($"sforward_server_master");
         }
 
-        public void Confirm()
+        public async Task<bool> Add(SForwardServerNodeStoreInfo info)
         {
-            config.Data.Update();
+            if (liteCollection.FindOne(c => c.NodeId == info.NodeId) != null)
+            {
+                return false;
+            }
+            liteCollection.Insert(info);
+            return await Task.FromResult(true).ConfigureAwait(false);
         }
 
-        public void SetInfo(SForwardServerNodeInfo node)
+        public async Task<bool> Delete(string nodeId)
         {
-            config.Data.Server.SForward.Distributed.Node = node;
-        }
-        public void UpdateInfo(SForwardServerNodeUpdateInfo update)
-        {
-            config.Data.Server.SForward.Distributed.Node.Name = update.Name;
-            config.Data.Server.SForward.Distributed.Node.MaxBandwidth = update.MaxBandwidth;
-            config.Data.Server.SForward.Distributed.Node.MaxBandwidthTotal = update.MaxBandwidthTotal;
-            config.Data.Server.SForward.Distributed.Node.MaxGbTotal = update.MaxGbTotal;
-            config.Data.Server.SForward.Distributed.Node.MaxGbTotalLastBytes = update.MaxGbTotalLastBytes;
-            config.Data.Server.SForward.Distributed.Node.Public = update.Public;
-            config.Data.Server.SForward.Distributed.Node.Domain = update.Domain;
-            config.Data.Server.SForward.Distributed.Node.Host = update.Host;
-            config.Data.Server.SForward.Distributed.Node.Url = update.Url;
-            config.Data.Server.SForward.Distributed.Node.Sync2Server = update.Sync2Server;
-
-            config.Data.Server.SForward.WebPort = update.WebPort;
-            config.Data.Server.SForward.TunnelPortRange = update.PortRange;
-        }
-        public void SetMasterHosts(string[] hosts)
-        {
-            config.Data.Server.SForward.Distributed.Node.MasterHosts = hosts;
-        }
-        public void SetMaxGbTotalLastBytes(long value)
-        {
-            config.Data.Server.SForward.Distributed.Node.MaxGbTotalLastBytes = value;
+            return await Task.FromResult(liteCollection.DeleteMany(c => c.NodeId == nodeId) > 0).ConfigureAwait(false);
         }
 
-        public void SetMaxGbTotalMonth(int month)
+        public async Task<List<SForwardServerNodeStoreInfo>> GetAll()
         {
-            config.Data.Server.SForward.Distributed.Node.MaxGbTotalMonth = month;
+            return await Task.FromResult(liteCollection.FindAll().ToList()).ConfigureAwait(false);
+        }
+
+        public async Task<SForwardServerNodeStoreInfo> GetByNodeId(string nodeId)
+        {
+            return await Task.FromResult(liteCollection.FindOne(c => c.NodeId == nodeId)).ConfigureAwait(false);
+        }
+        public async Task<bool> Report(SForwardServerNodeReportInfo info)
+        {
+            int length = liteCollection.UpdateMany(p => new SForwardServerNodeStoreInfo
+            {
+                LastTicks = Environment.TickCount64,
+                Bandwidth = info.Bandwidth,
+                Connections = info.Connections,
+                Version = info.Version,
+                ConnectionsRatio = info.ConnectionsRatio,
+                BandwidthRatio = info.BandwidthRatio,
+                Url = info.Url,
+                Logo = info.Logo,
+                DataEachMonth = info.DataEachMonth,
+                DataRemain = info.DataRemain,
+                Name = info.Name,
+                MasterCount = info.MasterCount,
+                Domain = info.Domain,
+                WebPort = info.WebPort,
+                TunnelPorts = info.TunnelPorts,
+            }, c => c.NodeId == info.NodeId);
+
+            return await Task.FromResult(length > 0).ConfigureAwait(false);
+        }
+
+        public async Task<bool> Update(SForwardServerNodeStoreInfo info)
+        {
+            int length = liteCollection.UpdateMany(p => new SForwardServerNodeStoreInfo
+            {
+                BandwidthEach = info.BandwidthEach,
+                Public = info.Public,
+                Host = info.Host,
+            }, c => c.NodeId == info.NodeId);
+
+            return await Task.FromResult(length > 0).ConfigureAwait(false); ;
         }
     }
 }

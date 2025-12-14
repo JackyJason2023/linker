@@ -8,6 +8,9 @@ node_modules
 
 packages
 
+.VSCodeCounter
 
 TestResults
 /VpnServer
+
+*.fpk

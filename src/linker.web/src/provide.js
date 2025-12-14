@@ -24,7 +24,7 @@ export const provideGlobalData = () => {
             configed: false
         },
         //登录信息
-        signin: { Connected: false, Version: 'v1.0.0.0',Super:false },
+        signin: { Connected: false, Version: 'v1.0.0.0',Super:false,SignInHost:'' },
         self: {}, //本机
         //已连接
         api: { connected: false },
@@ -40,8 +40,11 @@ export const provideGlobalData = () => {
     });
 
     window.addEventListener('resize', ()=>{
-        globalData.value.height = document.getElementById('main-body').offsetHeight;
-        globalData.value.width = window.innerWidth;
+        const body = document.getElementById('main-body');
+        if(body){
+            globalData.value.height = document.getElementById('main-body').offsetHeight;
+            globalData.value.width = window.innerWidth;
+        }
     });
 
     provide(globalDataSymbol, globalData);

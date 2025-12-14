@@ -8,34 +8,33 @@ namespace linker.messenger.relay.webapi
     {
         public string Path => "/relay/nodes.json";
 
-        private readonly RelayServerMasterTransfer relayServerMasterTransfer;
-        public WebApiRelayNodesController(RelayServerMasterTransfer relayServerMasterTransfer)
+        private readonly RelayServerNodeReportTransfer relayServerNodeReportTransfer;
+        public WebApiRelayNodesController(RelayServerNodeReportTransfer relayServerNodeReportTransfer)
         {
-            this.relayServerMasterTransfer = relayServerMasterTransfer;
+            this.relayServerNodeReportTransfer = relayServerNodeReportTransfer;
         }
-        public Memory<byte> Handle(string query)
+        public async Task<Memory<byte>> Handle(string query)
         {
-            return relayServerMasterTransfer.GetPublicNodes().Select(c =>
+            return (await relayServerNodeReportTransfer.GetPublicNodes().ConfigureAwait(false)).Select(c =>
             {
                 return new
                 {
-                    AllowProtocol = c.AllowProtocol,
+                    AllowProtocol = c.Protocol,
                     Name = c.Name,
                     Version = c.Version,
 
-                    BandwidthMaxMbps = c.MaxBandwidthTotal,
-                    BandwidthConnMbps = c.MaxBandwidth,
+                    BandwidthMaxMbps = c.Bandwidth,
+                    BandwidthConnMbps = c.BandwidthEach,
                     BandwidthCurrentMbps = c.BandwidthRatio,
 
-                    BandwidthGbMonth = c.MaxGbTotal,
-                    BandwidthByteAvailable = c.MaxGbTotalLastBytes,
+                    BandwidthGbMonth = c.DataEachMonth,
+                    BandwidthByteAvailable = c.DataRemain,
 
-                    ConnectionMaxNum = c.MaxConnection,
-                    ConnectionCurrentNum = c.ConnectionRatio,
+                    ConnectionMaxNum = c.Connections,
+                    ConnectionCurrentNum = c.ConnectionsRatio,
 
-                    EndPoint = c.EndPoint,
                     Url = c.Url,
-
+                    Logo = c.Logo,
                 };
             }).ToJson().ToBytes();
         }

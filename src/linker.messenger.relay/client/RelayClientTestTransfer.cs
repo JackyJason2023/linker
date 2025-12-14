@@ -1,8 +1,8 @@
 ﻿using linker.libs;
 using linker.libs.timer;
-using linker.messenger.relay.client.transport;
 using linker.messenger.relay.server;
 using linker.messenger.signin;
+using linker.tunnel.transport;
 using System.Net;
 using System.Net.NetworkInformation;
 
@@ -13,19 +13,15 @@ namespace linker.messenger.relay.client
     /// </summary>
     public sealed class RelayClientTestTransfer
     {
-        private readonly RelayClientTransfer relayTransfer;
+        private readonly TransportRelay transportRelay;
         private readonly SignInClientState signInClientState;
-        private readonly ISignInClientStore signInClientStore;
-        private readonly IRelayClientStore relayClientStore;
 
-        public List<RelayServerNodeReportInfo188> Nodes { get; private set; } = new List<RelayServerNodeReportInfo188>();
+        public List<RelayServerNodeStoreInfo> Nodes { get; private set; } = new List<RelayServerNodeStoreInfo>();
 
-        public RelayClientTestTransfer(RelayClientTransfer relayTransfer, SignInClientState signInClientState, ISignInClientStore signInClientStore, IRelayClientStore relayClientStore)
+        public RelayClientTestTransfer(TransportRelay transportRelay, SignInClientState signInClientState)
         {
-            this.relayTransfer = relayTransfer;
+            this.transportRelay = transportRelay;
             this.signInClientState = signInClientState;
-            this.signInClientStore = signInClientStore;
-            this.relayClientStore = relayClientStore;
 
             TestTask();
         }
@@ -40,20 +36,17 @@ namespace linker.messenger.relay.client
         {
             try
             {
-                IRelayClientTransport transport = relayTransfer.Transports.FirstOrDefault(d => d.Type == relayClientStore.Server.RelayType);
-                if (transport != null)
+                Nodes = await transportRelay.RelayTestAsync().ConfigureAwait(false);
+                var tasks = Nodes.Select(async (c) =>
                 {
-                    Nodes = await transport.RelayTestAsync().ConfigureAwait(false);
-                    var tasks = Nodes.Select(async (c) =>
-                    {
-                        c.EndPoint = c.EndPoint == null || c.EndPoint.Address.Equals(IPAddress.Any) ? signInClientState.Connection.Address : c.EndPoint;
+                    IPEndPoint ep = NetworkHelper.GetEndPoint(c.Host, 1802);
+                    IPAddress ip = ep.Address.Equals(IPAddress.Any) || ep.Address.Equals(IPAddress.Loopback) ? signInClientState.Connection.Address.Address : ep.Address;
 
-                        using Ping ping = new Ping();
-                        var resp = await ping.SendPingAsync(c.EndPoint.Address, 1000);
-                        c.Delay = resp.Status == IPStatus.Success ? (int)resp.RoundtripTime : -1;
-                    });
-                    await Task.WhenAll(tasks).ConfigureAwait(false);
-                }
+                    using Ping ping = new Ping();
+                    var resp = await ping.SendPingAsync(ip, 1000);
+                    c.Delay = resp.Status == IPStatus.Success ? (int)resp.RoundtripTime : -1;
+                });
+                await Task.WhenAll(tasks).ConfigureAwait(false);
             }
             catch (Exception)
             {

@@ -1,25 +1,36 @@
 <template>
-    <el-table-column prop="forward" :label="forward.show?$t('home.forward'):''" >
+    <el-table-column prop="forward" :label="$t('home.forward')" width="80">
         <template #default="scope">
-            <template v-if="forward.show && scope.row.Connected">
+            <template v-if="scope.row &&scope.row.hook_counter">
                 <AccessBoolean value="ForwardOther,ForwardSelf">
                     <template #default="{values}">
-                        <template v-if="values.ForwardOther || (values.ForwardSelf && scope.row.isSelf)">
+                        <div class="skeleton-animation" :style="`animation-delay:${scope.row.animationDelay}ms`" v-if="values.ForwardOther || (values.ForwardSelf && scope.row.isSelf)">
                             <div class="nowrap">
-                                <ConnectionShow :data="connections.list[scope.row.MachineId]" :row="scope.row" transitionId="forward"></ConnectionShow>
-                                <a href="javascript:;" :class="{green:forward.list[scope.row.MachineId]>0}" @click="handleEdit(scope.row.MachineId,scope.row.MachineName,values)">
-                                    <span :class="{gateway:forward.list[scope.row.MachineId]>0}">{{$t('home.forwardPort')}}({{forward.list[scope.row.MachineId]>99 ? '99+' : forward.list[scope.row.MachineId]}})</span>
+                                <ConnectionShow :row="scope.row" transactionId="forward"></ConnectionShow>
+                                <a href="javascript:;" :class="{green:scope.row.hook_counter.forward>0}" @click="handleEdit(scope.row.MachineId,scope.row.MachineName,values)">
+                                    <span :class="{gateway:scope.row.hook_counter.forward>0}">{{$t('home.forwardPort')}}({{scope.row.hook_counter.forward>99 ? '99+' : scope.row.hook_counter.forward}})</span>
                                 </a>
                             </div>
                             <div class="nowrap">
-                                <a href="javascript:;" :class="{green:sforward.list[scope.row.MachineId]>0}" @click="handleSEdit(scope.row.MachineId,scope.row.MachineName,values)">
-                                    <span :class="{gateway:sforward.list[scope.row.MachineId]>0 }">{{$t('home.forwardServer')}}({{sforward.list[scope.row.MachineId]>99 ? '99+' : sforward.list[scope.row.MachineId]}})</span>
+                                <a href="javascript:;" :class="{green:scope.row.hook_counter.sforward>0}" @click="handleSEdit(scope.row.MachineId,scope.row.MachineName,values)">
+                                    <span :class="{gateway:scope.row.hook_counter.sforward>0 }">{{$t('home.forwardServer')}}({{scope.row.hook_counter.sforward>99 ? '99+' :scope.row.hook_counter.sforward}})</span>
                                 </a>
                             </div>
-                        </template>
+                        </div>
                     </template>
                 </AccessBoolean>
             </template>
+            <template v-else-if="scope.row &&!scope.row.hook_counter_load">
+                <div class="skeleton-animation">
+                    <el-skeleton animated >
+                        <template #template>
+                            <p><el-skeleton-item variant="text" style="width: 50%;" /></p>
+                            <p><el-skeleton-item variant="text" style="width: 50%" /></p>
+                        </template>
+                    </el-skeleton>
+                </div>
+            </template>
+            <div class="device-remark"></div>
         </template>
     </el-table-column>
 </template>
@@ -28,20 +39,18 @@ import { injectGlobalData } from '@/provide';
 import { useForward } from './forward';
 import { useSforward } from './sforward';
 import { computed } from 'vue';
-import { useForwardConnections } from '../connection/connections';
-import ConnectionShow from '../connection/ConnectionShow.vue';
+import ConnectionShow from '../tunnel/ConnectionShow.vue';
 import { ElMessage } from 'element-plus';
 
 export default {
-    emits: ['edit','sedit'],
     components:{ConnectionShow},
-    setup(props, { emit }) {
+    setup() {
 
         const forward = useForward()
         const sforward = useSforward()
+        
         const globalData = injectGlobalData();
         const machineId = computed(() => globalData.value.config.Client.Id);
-        const connections = useForwardConnections();
 
         const handleEdit = (_machineId,_machineName,access)=>{
             if(machineId.value === _machineId){
@@ -75,12 +84,8 @@ export default {
             sforward.value.machineName = _machineName;
             sforward.value.showEdit = true;
         }
-        const handleForwardRefresh = ()=>{
-            emit('refresh');
-        }
-
         return {
-            forward,sforward,connections, handleEdit,handleSEdit,handleForwardRefresh
+           handleEdit,handleSEdit
         }
     }
 }

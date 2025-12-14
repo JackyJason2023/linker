@@ -1,6 +1,8 @@
 ﻿using linker.libs.extends;
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 namespace linker.libs
 {
     public static class SystemIdHelper
@@ -59,6 +61,61 @@ namespace linker.libs
             string cpu = CommandHelper.Osx(string.Empty, ["system_profiler SPHardwareDataType | grep \"Hardware UUID\""]).TrimNewLineAndWhiteSapce();
             string username = CommandHelper.Osx(string.Empty, ["whoami"]).TrimNewLineAndWhiteSapce();
             return $"{cpu}↓{username}↓{System.Runtime.InteropServices.RuntimeInformation.OSDescription}";
+        }
+
+        public static string GetSystemStr()
+        {
+            return $"{SystemName()}-{VersionNumber()}-any";
+        }
+        private static string SystemName()
+        {
+            string pattern = @"pve|ikuai|fnos|iphone|samsung|vivo|oppo|google|huawei|xiaomi|ios|android|windows|docker|ubuntu|openwrt|armbian|archlinux|fedora|centos|rocky|alpine|debian|linux";
+            return Regex.Match(GetDesc(), pattern)?.Value ?? "unknow";
+        }
+        private static string GetDesc()
+        {
+            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SNLTTY_LINKER_IS_BT")) == false)
+            {
+                return "bt";
+            }
+            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SNLTTY_LINKER_IS_FNOS")) == false)
+            {
+                return "fnos";
+            }
+            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SNLTTY_LINKER_IS_DOCKER")) == false)
+            {
+                return "docker";
+            }
+
+            if (File.Exists("/usr/trim/www/static/pong.html"))
+            {
+                return "fnos";
+            }
+
+            return RuntimeInformation.OSDescription.ToLower();
+        }
+
+        private static string VersionNumber()
+        {
+            var version = Environment.OSVersion.Version;
+            if (OperatingSystem.IsWindows())
+            {
+                return version.Major switch
+                {
+                    10 when version.Build >= 22000 => "11",
+                    10 when version.Build >= 10240 => "10",
+                    6 when version.Minor == 3 => "8.1",
+                    6 when version.Minor == 2 => "8",
+                    6 when version.Minor == 1 => "7",
+                    6 when version.Minor == 0 => "Vista",
+                    5 when version.Minor == 2 => "2003",
+                    5 when version.Minor == 1 => "XP",
+                    5 when version.Minor == 0 => "2000",
+                    _ => $"unknow"
+                };
+            }
+
+            return $"any";
         }
     }
 }

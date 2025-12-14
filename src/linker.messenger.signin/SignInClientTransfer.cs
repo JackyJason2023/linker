@@ -20,11 +20,10 @@ namespace linker.messenger.signin
         private readonly SignInArgsTransfer signInArgsTransfer;
         private readonly ISignInClientStore signInClientStore;
         private readonly ISerializer serializer;
-
-        private string signInHost = string.Empty;
+        private readonly ICommonStore commonStore;
 
         public SignInClientTransfer(SignInClientState clientSignInState, IMessengerSender messengerSender, IMessengerResolver messengerResolver,
-            SignInArgsTransfer signInArgsTransfer, ISignInClientStore signInClientStore, ISerializer serializer)
+            SignInArgsTransfer signInArgsTransfer, ISignInClientStore signInClientStore, ISerializer serializer, ICommonStore commonStore)
         {
             this.clientSignInState = clientSignInState;
             this.messengerSender = messengerSender;
@@ -32,6 +31,7 @@ namespace linker.messenger.signin
             this.signInArgsTransfer = signInArgsTransfer;
             this.signInClientStore = signInClientStore;
             this.serializer = serializer;
+            this.commonStore = commonStore;
         }
 
         /// <summary>
@@ -45,6 +45,7 @@ namespace linker.messenger.signin
                 {
                     if (clientSignInState.Connected == false)
                     {
+                        //未连接，按顺序尝试
                         string[] hosts = [signInClientStore.Server.Host, signInClientStore.Server.Host1, .. signInClientStore.Hosts];
                         foreach (var host in hosts.Where(c => string.IsNullOrWhiteSpace(c) == false))
                         {
@@ -56,6 +57,7 @@ namespace linker.messenger.signin
                     }
                     else
                     {
+                        //已连接，延期，测试主服务器，如果主服务器能连就切回主服务器
                         await Exp().ConfigureAwait(false);
                         if (await TestHost(signInClientStore.Server.Host))
                         {
@@ -73,7 +75,7 @@ namespace linker.messenger.signin
         }
         private async Task<bool> TestHost(string host)
         {
-            if (signInHost == signInClientStore.Server.Host) return false;
+            if (clientSignInState.SignInHost == signInClientStore.Server.Host) return false;
             try
             {
                 IPEndPoint ip = await NetworkHelper.GetEndPointAsync(host, 1802).ConfigureAwait(false);
@@ -105,6 +107,11 @@ namespace linker.messenger.signin
         /// <returns></returns>
         private async Task<int> SignIn(string host)
         {
+            if(commonStore.Installed == false)
+            {
+                LoggerHelper.Instance.Error($"not initialized");
+                return 1;
+            }
             if (string.IsNullOrWhiteSpace(signInClientStore.Group.Id))
             {
                 LoggerHelper.Instance.Error($"group id are empty");
@@ -166,7 +173,7 @@ namespace linker.messenger.signin
 
                 GCHelper.FlushMemory();
 
-                signInHost = host;
+                clientSignInState.SignInHost = host;
                 return 0;
             }
             catch (Exception ex)
@@ -284,6 +291,10 @@ namespace linker.messenger.signin
             }
         }
 
+        /// <summary>
+        /// 检查超级权限
+        /// </summary>
+        /// <returns></returns>
         public async Task CheckSuper()
         {
             MessageResponeInfo resp = await messengerSender.SendReply(new MessageRequestWrap
@@ -370,14 +381,14 @@ namespace linker.messenger.signin
         /// <returns></returns>
         public async Task Exp()
         {
-            if (signInHost != signInClientStore.Server.Host) return;
+
             var resp = await messengerSender.SendReply(new MessageRequestWrap
             {
                 Connection = clientSignInState.Connection,
                 MessengerId = (ushort)SignInMessengerIds.Exp,
                 Timeout = 3000
             }).ConfigureAwait(false);
-            if (resp.Code == MessageResponeCodes.OK && resp.Data.Length > 0)
+            if (resp.Code == MessageResponeCodes.OK && resp.Data.Length > 0 && clientSignInState.SignInHost == signInClientStore.Server.Host)
             {
                 var hosts = serializer.Deserialize<string[]>(resp.Data.Span);
                 if (hosts != null && hosts.Length > 0)

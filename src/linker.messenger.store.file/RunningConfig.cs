@@ -1,4 +1,5 @@
 ﻿using linker.libs;
+using linker.libs.extends;
 using linker.libs.timer;
 using LiteDB;
 using System.Text.Json.Serialization;
@@ -32,7 +33,6 @@ namespace linker.messenger.store.file
 
         private void Helper_OnAppExit(object sender, EventArgs e)
         {
-            Save();
             dBfactory.Dispose();
         }
 
@@ -54,6 +54,7 @@ namespace linker.messenger.store.file
         }
         private void SaveTask()
         {
+            Data.Update();
             TimerHelper.SetIntervalLong(() =>
             {
                 while (Data.Updated > 0)
@@ -69,6 +70,7 @@ namespace linker.messenger.store.file
             try
             {
                 RunningConfigInfo old = liteCollection.FindAll().FirstOrDefault();
+                
                 if (old == null)
                 {
                     liteCollection.Insert(Data);
@@ -88,6 +90,7 @@ namespace linker.messenger.store.file
                     };
                     liteCollection.Update(old.Id, old);
                 }
+                
             }
             catch (Exception ex)
             {
@@ -104,19 +107,17 @@ namespace linker.messenger.store.file
 
     public sealed partial class RunningConfigInfo
     {
-        public RunningConfigInfo() { }
-
         public ObjectId Id { get; set; }
 
         [JsonIgnore, BsonIgnore]
         public uint Updated { get; set; } = 1;
         [JsonIgnore, BsonIgnore]
-        public VersionManager Version { get; set; } = new VersionManager();
+        public VersionManager DataVersion { get; set; } = new VersionManager();
 
         public void Update()
         {
             Updated++;
-            Version.Increment();
+            DataVersion.Increment();
         }
     }
 }

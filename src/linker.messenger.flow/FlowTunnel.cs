@@ -1,11 +1,10 @@
 ﻿using linker.libs;
 using linker.libs.extends;
+using linker.messenger.channel;
 using linker.messenger.pcp;
-using linker.messenger.relay.client;
 using linker.messenger.signin;
 using linker.messenger.tuntap;
 using linker.messenger.tuntap.cidr;
-using linker.nat;
 using linker.tunnel;
 using linker.tunnel.connection;
 using System.Collections.Concurrent;
@@ -17,12 +16,12 @@ namespace linker.messenger.flow
     {
         private readonly FlowTunnel flowTunnel;
 
-        public FlowTuntapProxy(FlowTunnel flowTunnel, ISignInClientStore signInClientStore, TunnelTransfer tunnelTransfer, RelayClientTransfer relayTransfer, PcpTransfer pcpTransfer,
-            SignInClientTransfer signInClientTransfer, IRelayClientStore relayClientStore, TuntapConfigTransfer tuntapConfigTransfer,
+        public FlowTuntapProxy(FlowTunnel flowTunnel, ISignInClientStore signInClientStore, TunnelTransfer tunnelTransfer, PcpTransfer pcpTransfer,
+            SignInClientTransfer signInClientTransfer, TuntapConfigTransfer tuntapConfigTransfer,
             TuntapCidrConnectionManager tuntapCidrConnectionManager, TuntapCidrDecenterManager tuntapCidrDecenterManager,
-            TuntapCidrMapfileManager tuntapCidrMapfileManager,TuntapDecenter tuntapDecenter) 
-            : base(signInClientStore, tunnelTransfer, relayTransfer, pcpTransfer, signInClientTransfer, relayClientStore,
-                  tuntapConfigTransfer, tuntapCidrConnectionManager, tuntapCidrDecenterManager, tuntapCidrMapfileManager, tuntapDecenter)
+            TuntapCidrMapfileManager tuntapCidrMapfileManager,TuntapDecenter tuntapDecenter, ChannelConnectionCaching channelConnectionCaching) 
+            : base(signInClientStore, tunnelTransfer, pcpTransfer, signInClientTransfer,
+                  tuntapConfigTransfer, tuntapCidrConnectionManager, tuntapCidrDecenterManager, tuntapCidrMapfileManager, tuntapDecenter, channelConnectionCaching)
         {
             this.flowTunnel = flowTunnel;
         }

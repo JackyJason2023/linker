@@ -12,12 +12,14 @@
 
 <script>
 import { wlistAddOrder, wlistStatus } from '@/apis/wlist';
+import { injectGlobalData } from '@/provide';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { onMounted, reactive } from 'vue';
 export default {
     props:['type'],
     setup (props) {
         
+        const globalData = injectGlobalData();
         const state = reactive({
             status:{}
         });
@@ -41,10 +43,8 @@ export default {
         }
 
         onMounted(()=>{
-
-            wlistStatus(props.type).then(res=>{
+            wlistStatus(props.type,globalData.value.config.Client.Id).then(res=>{
                 state.status = res;
-                console.log(res);
             });
         });
 

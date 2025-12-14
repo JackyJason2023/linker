@@ -1,13 +1,20 @@
 <template>
     <div class="signin-wrap" :style="{height:`${state.height}px`}">
         <el-card shadow="never">
-            <template #header>{{$t('server.messenger')}}</template>
+            <template #header>
+                <div class="flex">
+                    <span>{{$t('server.messenger')}}</span>
+                    <span class="flex-1"></span>
+                    <Export></Export>
+                </div>
+            </template>
             <div>
                 <el-form label-width="auto" :label-position="state.position">
                     <el-form-item :label="$t('server.messengerAddr')">
                         <div class="flex">
-                            <el-input v-trim style="width:20rem;" v-model="state.list.Host" @blur="handleSave" />
-                            <Sync class="mgl-1" name="SignInServer"></Sync>
+                            <el-input v-trim :class="{success:state.list.Host==state.signinHost}" style="width:20rem;" v-model="state.list.Host" @blur="handleSave" />
+                            <span class="mgl-1"></span>
+                            <Sync name="SignInServer"></Sync>
                             <PcShow>
                                 <span class="mgl-1">{{$t('server.messengerText')}}</span>
                             </PcShow>
@@ -15,14 +22,15 @@
                     </el-form-item>
                     <el-form-item :label="`${$t('server.messengerAddr')}1`">
                         <div class="flex">
-                            <el-input v-trim style="width:20rem;" v-model="state.list.Host1" @blur="handleSave" />
+                            <el-input v-trim :class="{success:state.list.Host1==state.signinHost}" style="width:20rem;" v-model="state.list.Host1" @blur="handleSave" />
                         </div>
                     </el-form-item>
                     <el-form-item></el-form-item>
                     <el-form-item :label="$t('server.messengerSuperKey')">
                         <div class="flex">
                             <el-input v-trim :class="{success:state.super,error:state.super==false}" style="width:20rem;" type="password" show-password maxlength="36" v-model="state.list.SuperKey" @blur="handleSave" />
-                            <Sync class="mgl-1" name="SignInSuperKey"></Sync>
+                            <span class="mgl-1"></span>
+                            <Sync name="SignInSuperKey"></Sync>
                         </div>
                     </el-form-item>
                     <el-form-item :label="$t('server.messengerSuperPassword')">
@@ -34,7 +42,8 @@
                     <el-form-item :label="$t('server.messengerUserId')">
                         <div class="flex">
                             <el-input v-trim style="width:20rem;" type="password" show-password maxlength="36" v-model="state.list.UserId" @blur="handleSave" />
-                            <Sync class="mgl-1" name="SignInUserId"></Sync>
+                            <span class="mgl-1"></span>
+                            <Sync name="SignInUserId"></Sync>
                             <PcShow>
                                 <span class="mgl-1">{{$t('server.messengerUserIdText')}}</span>
                             </PcShow>
@@ -65,9 +74,9 @@ import SForwardServers from '../../../components/forward/Config.vue';
 import { useI18n } from 'vue-i18n';
 import Sync from '../../../components/sync/Index.vue'
 import WhiteList from '../../../components/wlist/Index.vue';
-
+import Export from './Export.vue';
 export default {
-    components:{Updater,RelayServers,SForwardServers,Sync,WhiteList},
+    components:{Updater,RelayServers,SForwardServers,Sync,WhiteList,Export},
     setup(props) {
         const {t} = useI18n();
         const globalData = injectGlobalData();
@@ -76,6 +85,7 @@ export default {
             height: computed(()=>globalData.value.height-90),
             position: computed(()=>globalData.value.isPhone ? 'top':'right'),
             super:computed(()=>globalData.value.signin.Super),
+            signinHost:computed(()=>globalData.value.signin.SignInHost),
         });
 
         const handleSave = ()=>{

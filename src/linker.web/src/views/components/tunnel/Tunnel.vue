@@ -3,49 +3,64 @@
         <template #default="{values}">
             <el-table-column prop="tunnel" :label="$t('home.tunnel')" width="86">
                 <template #default="scope">
-                    <template v-if="tunnel.list[scope.row.MachineId]">
-                        <div>
-                            <template v-if="tunnel.list[scope.row.MachineId].Net.CountryCode">
-                                <img 
-                                :title="`${tunnel.list[scope.row.MachineId].Net.CountryCode}、${tunnel.list[scope.row.MachineId].Net.City}`" 
-                                class="system" 
-                                :src="`https://unpkg.com/flag-icons@7.2.3/flags/4x3/${tunnel.list[scope.row.MachineId].Net.CountryCode.toLowerCase()}.svg`" />
-                            </template>
-                            <template v-else>
-                                <img title="?" class="system" src="/system.svg" />
-                            </template>
-                            <template v-if="tunnel.list[scope.row.MachineId].Net.Isp">
-                                <img 
-                                :title="`${tunnel.list[scope.row.MachineId].Net.Isp}`" 
-                                class="system" :src="netImg(tunnel.list[scope.row.MachineId].Net)" />
-                            </template>
-                            <template v-else>
-                                <img title="?" class="system" src="/system.svg" />
-                            </template>
-                            <template v-if="tunnel.list[scope.row.MachineId].Net.Nat">
-                                <span class="nat" :title="tunnel.list[scope.row.MachineId].Net.Nat">{{ natMap[tunnel.list[scope.row.MachineId].Net.Nat]  }}</span>
-                            </template>
-                            <template v-else>
-                                <img title="?" class="system" src="/system.svg" />
-                            </template>
-                        </div> 
-                        <div class="flex">
-                            <a href="javascript:;" class="a-line" 
-                            :class="{yellow:tunnel.list[scope.row.MachineId].NeedReboot}" 
-                            :title="$t('home.holeText')"
-                            @click="handleTunnel(tunnel.list[scope.row.MachineId],scope.row,values)">
-                                <span>{{$t('home.jump')}}:{{tunnel.list[scope.row.MachineId].RouteLevel}}+{{tunnel.list[scope.row.MachineId].RouteLevelPlus}}</span>
-                            </a>
+                    <template v-if="scope.row && scope.row.hook_tunnel">
+                        <div class="skeleton-animation" :style="`animation-delay:${scope.row.animationDelay}ms`">
+                            <div>
+                                <template v-if="scope.row.hook_tunnel.Net.CountryCode">
+                                    <img 
+                                    :title="`${scope.row.hook_tunnel.Net.CountryCode}、${scope.row.hook_tunnel.Net.City}`" 
+                                    class="system" 
+                                    :src="`https://unpkg.com/flag-icons@7.2.3/flags/4x3/${scope.row.hook_tunnel.Net.CountryCode.toLowerCase()}.svg`" />
+                                </template>
+                                <template v-else>
+                                    <img title="?" class="system" src="/system.svg" />
+                                </template>
+                                <template v-if="scope.row.hook_tunnel.Net.Isp">
+                                    <img 
+                                    :title="`${scope.row.hook_tunnel.Net.Isp}`" 
+                                    class="system" :src="netImg(scope.row.hook_tunnel.Net)" />
+                                </template>
+                                <template v-else>
+                                    <img title="?" class="system" src="/system.svg" />
+                                </template>
+                                <template v-if="scope.row.hook_tunnel.Net.Nat">
+                                    <span class="nat" :title="scope.row.hook_tunnel.Net.Nat">{{ natMap[scope.row.hook_tunnel.Net.Nat]  }}</span>
+                                </template>
+                                <template v-else>
+                                    <img title="?" class="system" src="/system.svg" />
+                                </template>
+                            </div> 
+                            <div class="flex">
+                                <a href="javascript:;" class="a-line" 
+                                :class="{yellow:scope.row.hook_tunnel.NeedReboot}" 
+                                :title="$t('home.holeText')"
+                                @click="handleTunnel(scope.row.hook_tunnel,scope.row,values)">
+                                    <span>{{$t('home.jump')}}:{{scope.row.hook_tunnel.RouteLevel}}+{{scope.row.hook_tunnel.RouteLevelPlus}}</span>
+                                </a>
+                            </div>
                         </div>
                     </template>
+                    <template v-else-if="scope.row &&!scope.row.hook_tunnel_load">
+                        <div class="skeleton-animation">
+                            <el-skeleton animated >
+                                <template #template>
+                                    <el-skeleton-item variant="text" class="el-skeleton-item" />
+                                    <el-skeleton-item variant="text" class="el-skeleton-item" />
+                                    <el-skeleton-item variant="text" class="el-skeleton-item-last"/>
+                                    <el-skeleton-item variant="text" class="el-skeleton-item2" />
+                                </template>
+                            </el-skeleton>
+                        </div>
+                    </template>
+                    <div class="device-remark"></div>
                 </template>
+
             </el-table-column>
         </template>
     </AccessBoolean>
 </template>
 <script>
 import { useTunnel } from './tunnel';
-import { useConnections,useForwardConnections,useSocks5Connections,useTuntapConnections } from '../connection/connections';
 import { injectGlobalData } from '@/provide';
 import { computed } from 'vue';
 import { ElMessage } from 'element-plus';
@@ -53,17 +68,13 @@ import {useI18n} from 'vue-i18n';
 
 export default {
     emits: ['edit','refresh'],
-    setup(props, { emit }) {
+    setup() {
 
         const t = useI18n();
         const globalData = injectGlobalData();
         const machineId = computed(() => globalData.value.config.Client.Id);
 
         const tunnel = useTunnel();
-        const connections = useConnections();
-        const forwardConnections = useForwardConnections();
-        const tuntapConnections = useTuntapConnections();
-        const socks5Connections = useSocks5Connections();
 
         const imgMap = {
             'chinanet':'chinanet.svg',
@@ -88,7 +99,6 @@ export default {
             }
             return `./system.svg`;
         }
-
         const natMap = {
             "Unknown":'?',
             "UnsupportedServer":'?',
@@ -101,43 +111,24 @@ export default {
             "Symmetric":'4',
         }
 
-        const connectionCount = (machineId)=>{
-                const length = [
-                    forwardConnections.value.list[machineId],
-                    tuntapConnections.value.list[machineId],
-                    socks5Connections.value.list[machineId],
-                ].filter(c=>!!c && c.Connected).length;
-                return length;
-        };
-       
         const handleTunnel = (_tunnel,row,access) => {
             if(machineId.value === _tunnel.MachineId){
                 if(!access.TunnelChangeSelf){
                     ElMessage.success(t('common.access'));
-                return;
-            }
+                    return;
+                }
             }else{
                 if(!access.TunnelChangeOther){
                     ElMessage.success(t('common.access'));
-                return;
-            }
+                    return;
+                }
             }
             _tunnel.device = row;
             tunnel.value.current = _tunnel;
             tunnel.value.showEdit = true;
         }
-        const handleTunnelRefresh = ()=>{
-            emit('refresh');
-        }
-        const handleConnections = (row)=>{
-            connections.value.current = row.MachineId;
-            connections.value.currentName = row.MachineName;
-            connections.value.showEdit = true;
-        }
-       
         return {
-            tunnel, handleTunnel,handleTunnelRefresh,
-            connectionCount,handleConnections,netImg,natMap
+            handleTunnel,netImg,natMap
         }
     }
 }
@@ -147,6 +138,10 @@ export default {
 .el-switch.is-disabled{opacity :1;}
 
 .green{font-weight:bold;}
+
+.el-skeleton-item{width: 30%;margin-right:3%}
+.el-skeleton-item-last{width: 30%;}
+.el-skeleton-item2{width: 70%}
 
 
 img.system,span.nat{
@@ -158,5 +153,5 @@ img.system,span.nat{
 }
 html.dark img.system,html.dark span.nat{border-color:#575c61;}
 
-span.nat{display:inline-block;padding:0 .2rem;margin-right:0;font-family: fantasy;}
+span.nat{display:inline-block;padding:0 .2rem;margin-right:0;font-family: cursive;}
 </style>

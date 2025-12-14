@@ -1,6 +1,5 @@
 ﻿using linker.libs.extends;
 using System.Collections.Concurrent;
-using linker.tunnel.connection;
 using System.Net;
 using linker.libs;
 using linker.messenger.signin;
@@ -45,36 +44,6 @@ namespace linker.messenger.tuntap
             this.serializer = serializer;
             this.tuntapProxy = tuntapProxy;
         }
-
-        /// <summary>
-        /// 连接
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        public ConnectionListInfo Connections(ApiControllerParamsInfo param)
-        {
-            ulong hashCode = ulong.Parse(param.Content);
-            if (tuntapProxy.Version.Eq(hashCode, out ulong version) == false)
-            {
-                return new ConnectionListInfo
-                {
-                    List = tuntapProxy.GetConnections(),
-                    HashCode = version
-                };
-            }
-            return new ConnectionListInfo { HashCode = version };
-        }
-
-        /// <summary>
-        /// 删除连接
-        /// </summary>
-        /// <param name="param"></param>
-        [Access(AccessValue.TunnelRemove)]
-        public void RemoveConnection(ApiControllerParamsInfo param)
-        {
-            tuntapProxy.RemoveConnection(param.Content);
-        }
-
 
         /// <summary>
         /// 路由表
@@ -248,7 +217,7 @@ namespace linker.messenger.tuntap
         }
         public async Task<bool> SetId(ApiControllerParamsInfo param)
         {
-            SetIdKeyValueInfo info = param.Content.DeJson<SetIdKeyValueInfo>();
+            KeyValueInfo<string, Guid> info = param.Content.DeJson<KeyValueInfo<string,Guid>>();
             if (info.Key == signInClientStore.Id)
             {
                 tuntapConfigTransfer.SetID(info.Value);
@@ -352,23 +321,11 @@ namespace linker.messenger.tuntap
 
     }
 
-    public sealed class SetIdKeyValueInfo
-    {
-        public string Key { get; set; }
-        public Guid Value { get; set; }
-    }
-
     public sealed class TuntabListInfo
     {
         public ConcurrentDictionary<string, TuntapInfo> List { get; set; }
         public ulong HashCode { get; set; }
     }
-    public sealed class ConnectionListInfo
-    {
-        public ConcurrentDictionary<string, ITunnelConnection> List { get; set; }
-        public ulong HashCode { get; set; }
-    }
-
     public sealed class NetworkParamInfo
     {
         public IPAddress IP { get; set; }

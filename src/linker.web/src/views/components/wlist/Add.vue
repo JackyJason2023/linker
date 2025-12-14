@@ -105,7 +105,7 @@ export default {
                 UserId:editState.value.UserId || '',
                 Name:editState.value.Name || '',
                 Remark:editState.value.Remark || '',
-                Nodes:editState.value.Nodes || [],
+                Nodes:editState.value.Nodes || ['*'],
                 Bandwidth:editState.value.Bandwidth || 0,
                 UseTime:editState.value.UseTime || '',
                 EndTime:editState.value.EndTime || '',
@@ -138,7 +138,8 @@ export default {
             state.ruleForm.Nodes = state.nodeIds.concat(ports);
         }
 
-        const handleShowNodes = ()=>{     
+        const handleShowNodes = ()=>{  
+            return false;   
             state.nodeIds = state.ruleForm.Nodes.filter(c=>!!!state.prefix ||c.indexOf(state.prefix) < 0);
             state.showNodes = true;
         }
@@ -178,9 +179,8 @@ export default {
                 if(state.apply2user){
                     json.UserId = state.machineids.filter(c=>c.MachineId == state.ruleForm.MachineId)[0].UserId;
                 }
-                json.UseTime = `${state.timeRange[0]} 00:00:00`;
-                json.EndTime = `${state.timeRange[1]} 23:59:59`;
-
+                json.UseTime = `${moment(state.timeRange[0]).format('YYYY-MM-DD')} 00:00:00`;
+                json.EndTime = `${moment(state.timeRange[1]).format('YYYY-MM-DD')} 23:59:59`;
                 wlistAdd(json).then(()=>{
                     ElMessage.success(t('common.oper'));
                     state.show = false;

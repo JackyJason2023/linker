@@ -1,13 +1,13 @@
-﻿using linker.tunnel;
-using linker.tunnel.connection;
-using linker.libs;
-using System.Buffers.Binary;
-using linker.messenger.relay.client;
-using linker.messenger.signin;
+﻿using linker.libs;
+using linker.messenger.channel;
 using linker.messenger.pcp;
+using linker.messenger.signin;
 using linker.messenger.tuntap.cidr;
 using linker.nat;
 using linker.tun.device;
+using linker.tunnel;
+using linker.tunnel.connection;
+using System.Buffers.Binary;
 
 namespace linker.messenger.tuntap
 {
@@ -30,9 +30,11 @@ namespace linker.messenger.tuntap
         private readonly TuntapDecenter tuntapDecenter;
 
         public TuntapProxy(ISignInClientStore signInClientStore,
-            TunnelTransfer tunnelTransfer, RelayClientTransfer relayTransfer, PcpTransfer pcpTransfer,
-            SignInClientTransfer signInClientTransfer, IRelayClientStore relayClientStore, TuntapConfigTransfer tuntapConfigTransfer, TuntapCidrConnectionManager tuntapCidrConnectionManager, TuntapCidrDecenterManager tuntapCidrDecenterManager, TuntapCidrMapfileManager tuntapCidrMapfileManager, TuntapDecenter tuntapDecenter)
-            : base(tunnelTransfer, relayTransfer, pcpTransfer, signInClientTransfer, signInClientStore, relayClientStore)
+            TunnelTransfer tunnelTransfer, PcpTransfer pcpTransfer,
+            SignInClientTransfer signInClientTransfer, TuntapConfigTransfer tuntapConfigTransfer,
+            TuntapCidrConnectionManager tuntapCidrConnectionManager, TuntapCidrDecenterManager tuntapCidrDecenterManager, 
+            TuntapCidrMapfileManager tuntapCidrMapfileManager, TuntapDecenter tuntapDecenter, ChannelConnectionCaching channelConnectionCaching)
+            : base(tunnelTransfer, pcpTransfer, signInClientTransfer, signInClientStore, channelConnectionCaching)
         {
             this.tuntapConfigTransfer = tuntapConfigTransfer;
             this.tuntapCidrConnectionManager = tuntapCidrConnectionManager;
@@ -85,9 +87,9 @@ namespace linker.messenger.tuntap
         public async Task InputPacket(LinkerTunDevicPacket packet)
         {
             //IPV4广播组播、IPV6 多播
-            if ((packet.IPV4Broadcast || packet.IPV6Multicast) && tuntapConfigTransfer.Info.Multicast == false && connections.IsEmpty == false)
+            if ((packet.IPV4Broadcast || packet.IPV6Multicast) && tuntapConfigTransfer.Info.Multicast == false && Connections.IsEmpty == false)
             {
-                await Task.WhenAll(connections.Values.Where(c => c != null && c.Connected).Select(c => c.SendAsync(packet.Buffer, packet.Offset, packet.Length)));
+                await Task.WhenAll(Connections.Values.Where(c => c != null && c.Connected).Select(c => c.SendAsync(packet.Buffer, packet.Offset, packet.Length))).ConfigureAwait(false);
                 return;
             }
 

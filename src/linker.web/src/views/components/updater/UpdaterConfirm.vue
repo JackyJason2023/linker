@@ -49,7 +49,6 @@ export default {
         const updater = useUpdater();
         const serverVersion = computed(()=>globalData.value.signin.Version);
         const updaterVersion = computed(()=>updater.value.current.Version);
-
         const versions = [
                 {label:`${updaterVersion.value}【最新版本】`,value:updaterVersion.value},
                 {label:`${serverVersion.value}【服务器版本】`,value:serverVersion.value},
@@ -57,7 +56,7 @@ export default {
         const state = reactive({
             show: true,
             type:'',
-            version:versions[0] || '',
+            version:versions[0] || {},
             versions:versions,
             msg:[]
         });
@@ -70,11 +69,11 @@ export default {
             }
         });
 
-        const getTypes = (access)=>{
+        const getTypes = (accesss)=>{
             const types =  [
                 {label:`仅【${updater.value.device.MachineName}】`,value:updater.value.device.MachineId},
-                access.UpdateOther.value ? {label:`本组所有`,value:'g-all'} : {},
-                access.UpdateOther.value ?  {label:`本服务器所有`,value:'s-all'} : {},
+                accesss.UpdateOther ? {label:`本组所有`,value:'g-all'} : {},
+                accesss.UpdateOther ?  {label:`本服务器所有`,value:'s-all'} : {},
             ].filter(c=>c.value);
             if(!state.type){
                 state.type = types[0] || '';
@@ -104,7 +103,7 @@ export default {
         });
 
         return {
-            state,getTypes,updater,handleUpdate
+            state,getTypes,handleUpdate
         }
     }
 }

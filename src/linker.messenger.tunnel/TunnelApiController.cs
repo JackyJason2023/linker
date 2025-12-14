@@ -23,10 +23,11 @@ namespace linker.messenger.tunnel
         private readonly ISerializer serializer;
         private readonly TunnelNetworkTransfer tunnelNetworkTransfer;
         private readonly TunnelTransfer tunnelTransfer;
+        private readonly ITunnelMessengerAdapter tunnelMessengerAdapter;
 
         public TunnelApiController(SignInClientState signInClientState, IMessengerSender messengerSender, ISignInClientStore signInClientStore,
             TunnelDecenter tunnelDecenter, ITunnelClientStore tunnelClientStore, ISerializer serializer, TunnelNetworkTransfer tunnelNetworkTransfer,
-            TunnelTransfer tunnelTransfer)
+            TunnelTransfer tunnelTransfer, ITunnelMessengerAdapter tunnelMessengerAdapter)
         {
             this.signInClientState = signInClientState;
             this.messengerSender = messengerSender;
@@ -36,6 +37,7 @@ namespace linker.messenger.tunnel
             this.serializer = serializer;
             this.tunnelNetworkTransfer = tunnelNetworkTransfer;
             this.tunnelTransfer = tunnelTransfer;
+            this.tunnelMessengerAdapter = tunnelMessengerAdapter;
         }
 
         /// <summary>
@@ -70,9 +72,18 @@ namespace linker.messenger.tunnel
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        public ConcurrentDictionary<string, bool> Operating(ApiControllerParamsInfo param)
+        public TunnelOperatingInfo Operating(ApiControllerParamsInfo param)
         {
-            return tunnelTransfer.Operating;
+            ulong hashCode = ulong.Parse(param.Content);
+            if (tunnelTransfer.OperatingVersion.Eq(hashCode, out ulong version) == false)
+            {
+                return new TunnelOperatingInfo
+                {
+                    List = tunnelTransfer.Operating,
+                    HashCode = version
+                };
+            }
+            return new TunnelOperatingInfo { HashCode = version };
         }
         /// <summary>
         /// 连接
@@ -82,7 +93,7 @@ namespace linker.messenger.tunnel
         public bool Connect(ApiControllerParamsInfo param)
         {
             TunnelConnectInfo tunnelConnectInfo = param.Content.DeJson<TunnelConnectInfo>();
-            _ = tunnelTransfer.ConnectAsync(tunnelConnectInfo.ToMachineId, tunnelConnectInfo.TransactionId, tunnelConnectInfo.DenyProtocols);
+            _ = tunnelTransfer.ConnectAsync(tunnelConnectInfo.ToMachineId, tunnelConnectInfo.TransactionId, tunnelConnectInfo.DenyProtocols, exTransportNames: ["TcpRelay"]);
 
             return true;
         }
@@ -113,6 +124,7 @@ namespace linker.messenger.tunnel
 
             return true;
         }
+
         /// <summary>
         /// 获取打洞协议
         /// </summary>
@@ -122,7 +134,7 @@ namespace linker.messenger.tunnel
         {
             if (param.Content == signInClientStore.Id || string.IsNullOrWhiteSpace(param.Content))
             {
-                return await tunnelClientStore.GetTunnelTransports().ConfigureAwait(false);
+                return await tunnelMessengerAdapter.GetTunnelTransports(Helper.GlobalString).ConfigureAwait(false);
             }
 
             MessageResponeInfo resp = await messengerSender.SendReply(new MessageRequestWrap
@@ -150,9 +162,10 @@ namespace linker.messenger.tunnel
             TunnelTransportItemSetInfo info = param.Content.DeJson<TunnelTransportItemSetInfo>();
             if (info.MachineId == signInClientStore.Id || string.IsNullOrWhiteSpace(info.MachineId))
             {
-                await tunnelClientStore.SetTunnelTransports(info.Data).ConfigureAwait(false);
+                await tunnelMessengerAdapter.SetTunnelTransports(Helper.GlobalString, info.Data).ConfigureAwait(false);
                 return true;
             }
+            await tunnelMessengerAdapter.SetTunnelTransports(info.MachineId, info.Data).ConfigureAwait(false);
             MessageResponeInfo resp = await messengerSender.SendReply(new MessageRequestWrap
             {
                 Connection = signInClientState.Connection,
@@ -161,6 +174,7 @@ namespace linker.messenger.tunnel
             }).ConfigureAwait(false);
             return resp.Code == MessageResponeCodes.OK && resp.Data.Span.SequenceEqual(Helper.TrueArray);
         }
+
 
         public async Task<TunnelLocalNetworkInfo> GetNetwork(ApiControllerParamsInfo param)
         {
@@ -184,6 +198,11 @@ namespace linker.messenger.tunnel
             return new TunnelLocalNetworkInfo();
         }
 
+        public sealed class TunnelOperatingInfo
+        {
+            public ConcurrentDictionary<string, bool> List { get; set; }
+            public ulong HashCode { get; set; }
+        }
         public sealed class TunnelListInfo
         {
             public ConcurrentDictionary<string, TunnelRouteLevelInfo> List { get; set; }

@@ -1,11 +1,6 @@
-﻿using linker.libs;
-using linker.libs.extends;
-using linker.libs.timer;
-using linker.messenger.relay.client.transport;
-using linker.messenger.relay.messenger;
+﻿
+using linker.messenger.node;
 using linker.messenger.signin;
-using System.Collections.Concurrent;
-using System.Net;
 
 namespace linker.messenger.relay.server
 {
@@ -14,39 +9,22 @@ namespace linker.messenger.relay.server
     /// </summary>
     public class RelayServerMasterTransfer
     {
-
-        private ulong relayFlowingId = 0;
-        private readonly ConcurrentDictionary<string, RelayServerNodeReportInfo188> reports = new ConcurrentDictionary<string, RelayServerNodeReportInfo188>();
-
-
-        private readonly ConcurrentQueue<Dictionary<int, long>> trafficQueue = new ConcurrentQueue<Dictionary<int, long>>();
-        private readonly ConcurrentQueue<List<int>> trafficIdsQueue = new ConcurrentQueue<List<int>>();
-
         private readonly IRelayServerCaching relayCaching;
-        private readonly ISerializer serializer;
-        private readonly IRelayServerMasterStore relayServerMasterStore;
-        private readonly IMessengerSender messengerSender;
         private readonly IRelayServerWhiteListStore relayServerWhiteListStore;
-
-        public RelayServerMasterTransfer(IRelayServerCaching relayCaching, ISerializer serializer, IRelayServerMasterStore relayServerMasterStore, 
-            IMessengerSender messengerSender, IRelayServerWhiteListStore relayServerWhiteListStore)
+        private readonly RelayServerConnectionTransfer relayServerConnectionTransfer;
+        public RelayServerMasterTransfer(IRelayServerCaching relayCaching, IRelayServerWhiteListStore relayServerWhiteListStore,
+            RelayServerConnectionTransfer relayServerConnectionTransfer)
         {
             this.relayCaching = relayCaching;
-            this.serializer = serializer;
-            this.relayServerMasterStore = relayServerMasterStore;
-            this.messengerSender = messengerSender;
             this.relayServerWhiteListStore = relayServerWhiteListStore;
-
+            this.relayServerConnectionTransfer = relayServerConnectionTransfer;
         }
 
-
-        public ulong AddRelay(SignCacheInfo from, SignCacheInfo to)
+        public bool AddRelay(SignCacheInfo from, SignCacheInfo to, uint flowid)
         {
-            ulong flowingId = Interlocked.Increment(ref relayFlowingId);
-
             RelayCacheInfo cache = new RelayCacheInfo
             {
-                FlowId = flowingId,
+                FlowId = flowid,
                 FromId = from.MachineId,
                 FromName = from.MachineName,
                 ToId = to.Id,
@@ -55,18 +33,18 @@ namespace linker.messenger.relay.server
                 Super = from.Super,
                 UserId = from.UserId,
             };
-            if (relayCaching.TryAdd($"{cache.FromId}->{cache.ToId}->{flowingId}", cache, 15000) == false)
-            {
-                return 0;
-            }
-            return flowingId;
+            return relayCaching.TryAdd($"{cache.FromId}->{cache.ToId}->{flowid}", cache, 15000);
         }
-
         public async Task<RelayCacheInfo> TryGetRelayCache(string key, string nodeid)
         {
-            if (relayCaching.TryGetValue(key, out RelayCacheInfo cache) && reports.TryGetValue(nodeid, out var node))
+            if (relayServerConnectionTransfer.TryGet(ConnectionSideType.Node, nodeid, out ConnectionInfo connection) == false)
             {
-                List<double> bandwidth = await relayServerWhiteListStore.GetBandwidth(cache.UserId, cache.FromId, cache.ToId, node.Id);
+                return null;
+            }
+
+            if (relayCaching.TryGetValue(key, out RelayCacheInfo cache))
+            {
+                List<double> bandwidth = await relayServerWhiteListStore.GetBandwidth(cache.UserId, cache.FromId, cache.ToId, nodeid);
                 if (bandwidth.Any(c => c < 0))
                 {
                     return null;
@@ -79,143 +57,6 @@ namespace linker.messenger.relay.server
                 return cache;
             }
             return null;
-        }
-        public void SetNodeReport(IConnection connection, RelayServerNodeReportInfo170 info)
-        {
-            SetNodeReport(connection, new RelayServerNodeReportInfo188
-            {
-                Version = string.Empty,
-                Sync2Server = false,
-                Id = info.Id,
-                Name = info.Name,
-                MaxConnection = info.MaxConnection,
-                MaxBandwidth = info.MaxBandwidth,
-                MaxBandwidthTotal = info.MaxBandwidthTotal,
-                MaxGbTotal = info.MaxGbTotal,
-                MaxGbTotalLastBytes = info.MaxGbTotalLastBytes,
-                ConnectionRatio = info.ConnectionRatio,
-                BandwidthRatio = info.BandwidthRatio,
-                Public = info.Public,
-                EndPoint = info.EndPoint,
-                LastTicks = info.LastTicks,
-                Url = info.Url,
-                Connection = connection
-            });
-        }
-        public void SetNodeReport(IConnection connection, RelayServerNodeReportInfo188 info)
-        {
-            try
-            {
-                if (info.EndPoint.Address.Equals(IPAddress.Any))
-                {
-                    info.EndPoint.Address = connection.Address.Address;
-                }
-                if (info.EndPoint.Address.Equals(IPAddress.Loopback))
-                {
-                    info.EndPoint = new IPEndPoint(IPAddress.Any, 0);
-                }
-                info.LastTicks = Environment.TickCount64;
-                info.Connection = connection;
-                reports.AddOrUpdate(info.Id, info, (a, b) => info);
-            }
-            catch (Exception ex)
-            {
-                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
-                {
-                    LoggerHelper.Instance.Error(ex);
-                }
-            }
-        }
-        public async Task Edit(RelayServerNodeUpdateInfo info)
-        {
-            if (reports.TryGetValue(info.Id, out RelayServerNodeReportInfo188 cache))
-            {
-                await messengerSender.SendOnly(new MessageRequestWrap
-                {
-                    Connection = cache.Connection,
-                    MessengerId = (ushort)RelayMessengerIds.Edit,
-                    Payload = serializer.Serialize(info)
-                }).ConfigureAwait(false);
-            }
-        }
-        public async Task Edit(RelayServerNodeUpdateInfo188 info)
-        {
-            if (reports.TryGetValue(info.Id, out RelayServerNodeReportInfo188 cache))
-            {
-                await messengerSender.SendOnly(new MessageRequestWrap
-                {
-                    Connection = cache.Connection,
-                    MessengerId = (ushort)RelayMessengerIds.Edit188,
-                    Payload = serializer.Serialize(info)
-                }).ConfigureAwait(false);
-            }
-        }
-        public async Task Exit(string id)
-        {
-            if (reports.TryGetValue(id, out RelayServerNodeReportInfo188 cache))
-            {
-                await messengerSender.SendOnly(new MessageRequestWrap
-                {
-                    Connection = cache.Connection,
-                    MessengerId = (ushort)RelayMessengerIds.Exit,
-                }).ConfigureAwait(false);
-            }
-        }
-        public async Task Update(string id, string version)
-        {
-            if (reports.TryGetValue(id, out RelayServerNodeReportInfo188 cache))
-            {
-                await messengerSender.SendOnly(new MessageRequestWrap
-                {
-                    Connection = cache.Connection,
-                    MessengerId = (ushort)RelayMessengerIds.Update,
-                    Payload = serializer.Serialize(version)
-                }).ConfigureAwait(false);
-            }
-        }
-
-        /// <summary>
-        /// 获取节点列表
-        /// </summary>
-        /// <param name="validated">是否已认证</param>
-        /// <returns></returns>
-        public async Task<List<RelayServerNodeReportInfo188>> GetNodes(bool validated, string userid, string machineId)
-        {
-            var nodes = (await relayServerWhiteListStore.GetNodes(userid, machineId)).Where(c => c.Bandwidth >= 0).SelectMany(c => c.Nodes);
-
-            var result = reports.Values
-                .Where(c => Environment.TickCount64 - c.LastTicks < 15000)
-                .Where(c =>
-                {
-                    return validated || nodes.Contains(c.Id) || nodes.Contains("*")
-                    || (c.Public && c.ConnectionRatio < c.MaxConnection && (c.MaxGbTotal == 0 || (c.MaxGbTotal > 0 && c.MaxGbTotalLastBytes > 0)));
-                })
-                .OrderByDescending(c => c.LastTicks);
-
-            return result.OrderByDescending(x => x.MaxConnection == 0 ? int.MaxValue : x.MaxConnection)
-                     .ThenBy(x => x.ConnectionRatio)
-                     .ThenBy(x => x.BandwidthRatio)
-                     .ThenByDescending(x => x.MaxBandwidth == 0 ? double.MaxValue : x.MaxBandwidth)
-                     .ThenByDescending(x => x.MaxBandwidthTotal == 0 ? double.MaxValue : x.MaxBandwidthTotal)
-                     .ThenByDescending(x => x.MaxGbTotal == 0 ? double.MaxValue : x.MaxGbTotal)
-                     .ThenByDescending(x => x.MaxGbTotalLastBytes == 0 ? long.MaxValue : x.MaxGbTotalLastBytes)
-                     .ToList();
-        }
-        public List<RelayServerNodeReportInfo188> GetPublicNodes()
-        {
-            var result = reports.Values
-                .Where(c => Environment.TickCount64 - c.LastTicks < 15000)
-                .Where(c => c.Public)
-                .OrderByDescending(c => c.LastTicks);
-
-            return result.OrderByDescending(x => x.MaxConnection == 0 ? int.MaxValue : x.MaxConnection)
-                     .ThenBy(x => x.ConnectionRatio)
-                     .ThenBy(x => x.BandwidthRatio)
-                     .ThenByDescending(x => x.MaxBandwidth == 0 ? double.MaxValue : x.MaxBandwidth)
-                     .ThenByDescending(x => x.MaxBandwidthTotal == 0 ? double.MaxValue : x.MaxBandwidthTotal)
-                     .ThenByDescending(x => x.MaxGbTotal == 0 ? double.MaxValue : x.MaxGbTotal)
-                     .ThenByDescending(x => x.MaxGbTotalLastBytes == 0 ? long.MaxValue : x.MaxGbTotalLastBytes)
-                     .ToList();
         }
 
     }

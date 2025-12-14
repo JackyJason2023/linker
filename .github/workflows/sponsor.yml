@@ -33,10 +33,10 @@ jobs:
           AFDIAN_PADDINGX_SCALE: 0
           AFDIAN_PADDINGY_SCALE: 0
 
-      - name: Push afdian-sponsor-svg to the out/sponsor branch
+      - name: Push afdian-sponsor-svg to the sponsor branch
         uses: crazy-max/ghaction-github-pages@v4
         with:
-          target_branch: out/sponsor
+          target_branch: sponsor
           build_dir: dist
           commit_message: "ci(sponsor): deploy"
         env:

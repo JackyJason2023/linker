@@ -40,6 +40,7 @@ namespace linker.messenger.tunnel
 
     public sealed partial class TunnelNetInfo
     {
+        public TunnelNetInfo() { }
         public string City { get; set; } = string.Empty;
         public string CountryCode { get; set; } = string.Empty;
         public double Lat { get; set; }
@@ -58,6 +59,7 @@ namespace linker.messenger.tunnel
 
     public sealed class TunnelPublicNetworkInfo
     {
+        public TunnelPublicNetworkInfo() { }
         /// <summary>
         /// 网关层级
         /// </summary>
@@ -76,6 +78,9 @@ namespace linker.messenger.tunnel
 
     public sealed class TunnelTransportItemSetInfo
     {
+        /// <summary>
+        /// 发送方填对方ID，服务端会转换，接收方收到的也是对方ID
+        /// </summary>
         public string MachineId { get; set; }
         public List<TunnelTransportItemInfo> Data { get; set; }
     }

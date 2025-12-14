@@ -15,19 +15,18 @@ namespace linker.messenger.updater
         private readonly SignInClientState signInClientState;
         private readonly UpdaterHelper updaterHelper;
         private readonly ISignInClientStore signInClientStore;
-        private readonly IUpdaterCommonStore updaterCommonTransfer;
         private readonly ISerializer serializer;
         private readonly IUpdaterClientStore updaterClientStore;
 
         public VersionManager Version { get; } = new VersionManager();
 
-        public UpdaterClientTransfer(IMessengerSender messengerSender, SignInClientState signInClientState, UpdaterHelper updaterHelper, ISignInClientStore signInClientStore, IUpdaterCommonStore updaterCommonTransfer, ISerializer serializer, IUpdaterClientStore updaterClientStore)
+        public UpdaterClientTransfer(IMessengerSender messengerSender, SignInClientState signInClientState, UpdaterHelper updaterHelper,
+            ISignInClientStore signInClientStore, ISerializer serializer, IUpdaterClientStore updaterClientStore)
         {
             this.messengerSender = messengerSender;
             this.signInClientState = signInClientState;
             this.updaterHelper = updaterHelper;
             this.signInClientStore = signInClientStore;
-            this.updaterCommonTransfer = updaterCommonTransfer;
             this.serializer = serializer;
             this.updaterClientStore = updaterClientStore;
 
@@ -171,7 +170,7 @@ namespace linker.messenger.updater
             }).ConfigureAwait(false);
             if (resp.Code == MessageResponeCodes.OK && resp.Data.Length > 0)
             {
-                Updater186Info info = serializer.Deserialize<Updater186Info>(resp.Data.Span);
+                UpdaterInfo170 info = serializer.Deserialize<UpdaterInfo170>(resp.Data.Span);
 
                 //服务端不是已经开始下载，本地也不是已经开始下载，就更新一下本地状态
                 if (info.Status < UpdaterStatus.Downloading && updateInfo.Status < UpdaterStatus.Downloading)

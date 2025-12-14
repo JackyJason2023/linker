@@ -1,0 +1,8 @@
+{
+    "defaults":
+    {
+        "run-as": "package"
+    },
+    "username": "linker-docker",
+    "groupname": "linker-docker"
+}

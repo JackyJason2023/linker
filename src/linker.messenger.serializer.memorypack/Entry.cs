@@ -30,7 +30,7 @@ namespace linker.messenger.serializer.memorypack
 
 
             MemoryPackFormatterProvider.Register(new SyncInfoFormatter());
-            MemoryPackFormatterProvider.Register(new Sync184InfoFormatter());
+            MemoryPackFormatterProvider.Register(new SyncInfoFormatter());
 
 
             MemoryPackFormatterProvider.Register(new TunnelTransportWanPortInfoFormatter());
@@ -56,27 +56,30 @@ namespace linker.messenger.serializer.memorypack
             MemoryPackFormatterProvider.Register(new UpdaterClientInfo170Formatter());
             MemoryPackFormatterProvider.Register(new UpdaterInfoFormatter());
             MemoryPackFormatterProvider.Register(new UpdaterInfo170Formatter());
-            MemoryPackFormatterProvider.Register(new Updater184InfoFormatter());
-            MemoryPackFormatterProvider.Register(new Updater186InfoFormatter());
+            MemoryPackFormatterProvider.Register(new UpdaterInfo170Formatter());
+            MemoryPackFormatterProvider.Register(new UpdaterInfo170Formatter());
             MemoryPackFormatterProvider.Register(new UpdaterSyncInfoFormatter());
 
-            MemoryPackFormatterProvider.Register(new RelayTestInfoFormatter());
-            MemoryPackFormatterProvider.Register(new RelayTestInfo170Formatter());
-            MemoryPackFormatterProvider.Register(new RelayTestInfo188Formatter());
-            MemoryPackFormatterProvider.Register(new RelayInfoFormatter());
-            MemoryPackFormatterProvider.Register(new RelayInfo170Formatter());
-            MemoryPackFormatterProvider.Register(new RelayServerNodeUpdateInfoFormatter());
-            MemoryPackFormatterProvider.Register(new RelayServerNodeUpdateInfo188Formatter());
-            MemoryPackFormatterProvider.Register(new RelayServerNodeUpdateWrapInfoFormatter());
-            MemoryPackFormatterProvider.Register(new RelayServerNodeUpdateWrapInfo188Formatter());
-            MemoryPackFormatterProvider.Register(new RelayServerNodeReportInfoFormatter());
-            MemoryPackFormatterProvider.Register(new RelayServerNodeReportInfo170Formatter());
-            MemoryPackFormatterProvider.Register(new RelayServerNodeReportInfo188Formatter());
+
+            MemoryPackFormatterProvider.Register(new NodeShareInfoFormatter());
+            MemoryPackFormatterProvider.Register(new MastersRequestInfoFormatter());
+            MemoryPackFormatterProvider.Register(new MasterConnInfoFormatter());
+            MemoryPackFormatterProvider.Register(new MastersResponseInfoFormatter());
+            MemoryPackFormatterProvider.Register(new MasterDenyStoreRequestInfoFormatter());
+            MemoryPackFormatterProvider.Register(new MasterDenyStoreResponseInfoFormatter());
+            MemoryPackFormatterProvider.Register(new MasterDenyStoreInfoFormatter());
+            MemoryPackFormatterProvider.Register(new MasterDenyAddInfoFormatter());
+            MemoryPackFormatterProvider.Register(new MasterDenyDelInfoFormatter());
+
+
             MemoryPackFormatterProvider.Register(new RelayAskResultInfoFormatter());
-            MemoryPackFormatterProvider.Register(new RelayAskResultInfo170Formatter());
             MemoryPackFormatterProvider.Register(new RelayCacheInfoFormatter());
             MemoryPackFormatterProvider.Register(new RelayMessageInfoFormatter());
+            MemoryPackFormatterProvider.Register(new RelayServerNodeReportInfoFormatter());
+            MemoryPackFormatterProvider.Register(new RelayServerNodeStoreInfoFormatter());
 
+            MemoryPackFormatterProvider.Register(new RelayServerNodeReportInfoFormatterOld());
+            
 
             MemoryPackFormatterProvider.Register(new AccessUpdateInfoFormatter());
             MemoryPackFormatterProvider.Register(new AccessBitsUpdateInfoFormatter());
@@ -95,13 +98,9 @@ namespace linker.messenger.serializer.memorypack
             MemoryPackFormatterProvider.Register(new SForwardAddForwardInfoFormatter());
             MemoryPackFormatterProvider.Register(new SForwardRemoveForwardInfoFormatter());
             MemoryPackFormatterProvider.Register(new SForwardProxyInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardCountInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardAddForwardInfo191Formatter());
-            MemoryPackFormatterProvider.Register(new SForwardAddInfo191Formatter());
-            MemoryPackFormatterProvider.Register(new SForwardInfo191Formatter());
-            MemoryPackFormatterProvider.Register(new SForwardServerNodeUpdateInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardServerNodeUpdateWrapInfoFormatter());
             MemoryPackFormatterProvider.Register(new SForwardServerNodeReportInfoFormatter());
+            MemoryPackFormatterProvider.Register(new SForwardServerNodeStoreInfoFormatter());
+            MemoryPackFormatterProvider.Register(new SForwardServerNodeReportInfoOldFormatter());
 
 
             MemoryPackFormatterProvider.Register(new ForwardInfoFormatter());
@@ -172,7 +171,7 @@ namespace linker.messenger.serializer.memorypack
             MemoryPackFormatterProvider.Register(new WhiteListPageRequestInfoFormatter());
             MemoryPackFormatterProvider.Register(new WhiteListPageResultInfoFormatter());
             MemoryPackFormatterProvider.Register(new WhiteListOrderStatusInfoFormatter());
-            
+
             return serviceCollection;
         }
         public static ServiceProvider UseSerializerMemoryPack(this ServiceProvider serviceProvider)

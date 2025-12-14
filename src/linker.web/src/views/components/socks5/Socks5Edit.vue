@@ -1,5 +1,5 @@
 <template>
-     <el-dialog v-model="state.show" :close-on-click-modal="false" append-to=".app-wrap" :title="`设置[${state.machineName}]代理`" top="1vh" width="700">
+     <el-dialog v-model="state.show" :close-on-click-modal="false" append-to=".app-wrap" :title="`设置[${state.machineName}]代理`" top="1vh" width="780">
         <div>
             <el-form ref="ruleFormRef" :model="state.ruleForm" :rules="state.rules" label-width="140">
                 <el-form-item prop="gateway" style="margin-bottom:0">
@@ -27,7 +27,6 @@ import { injectGlobalData } from '@/provide';
 import { ElMessage } from 'element-plus';
 import { reactive, ref, watch } from 'vue';
 import { useSocks5 } from './socks5';
-import { Delete, Plus } from '@element-plus/icons-vue'
 import Socks5Lan from './Socks5Lan.vue';
 export default {
     props: ['modelValue'],
@@ -61,7 +60,7 @@ export default {
 
         const socks5Dom = ref(null);
         const handleSave = () => {
-            const json = JSON.parse(JSON.stringify(socks5.value.current));
+            const json = JSON.parse(JSON.stringify(socks5.value.current,(key,value)=> key =='device'?'':value));
             json.Port = +(state.ruleForm.Port || '1805');
             json.Lans = socks5Dom.value.getData();
             updateSocks5(json).then(() => {

@@ -1,24 +1,19 @@
 ﻿using linker.libs;
-using linker.libs.winapis;
-using linker.messenger.relay.server;
 using linker.messenger.signin;
 using linker.messenger.wlist.order;
-using System.Reflection.PortableExecutable;
 
 namespace linker.messenger.wlist
 {
 
     public class WhiteListServerMessenger : IMessenger
     {
-        private readonly IMessengerSender messengerSender;
         private readonly SignInServerCaching signCaching;
         private readonly ISerializer serializer;
         private readonly IWhiteListServerStore whiteListServerStore;
         private readonly OrderTransfer orderTransfer;
 
-        public WhiteListServerMessenger(IMessengerSender messengerSender, SignInServerCaching signCaching, ISerializer serializer, IWhiteListServerStore whiteListServerStore, OrderTransfer orderTransfer)
+        public WhiteListServerMessenger(SignInServerCaching signCaching, ISerializer serializer, IWhiteListServerStore whiteListServerStore, OrderTransfer orderTransfer)
         {
-            this.messengerSender = messengerSender;
             this.signCaching = signCaching;
             this.serializer = serializer;
             this.whiteListServerStore = whiteListServerStore;
@@ -92,21 +87,32 @@ namespace linker.messenger.wlist
         [MessengerId((ushort)WhiteListMessengerIds.Status)]
         public async Task Status(IConnection connection)
         {
-            string type = serializer.Deserialize<string>(connection.ReceiveRequestWrap.Payload.Span);
-            if (signCaching.TryGet(connection.Id, out SignCacheInfo cache) == false)
+            KeyValuePair<string, string> info;
+
+            try
+            {
+                info = serializer.Deserialize<KeyValuePair<string, string>>(connection.ReceiveRequestWrap.Payload.Span);
+            }
+            catch (Exception)
+            {
+                string type = serializer.Deserialize<string>(connection.ReceiveRequestWrap.Payload.Span);
+                info = new KeyValuePair<string, string>(type, connection.Id);
+            }
+
+            if (signCaching.TryGet(connection.Id, out SignCacheInfo cache) == false || signCaching.TryGet(info.Value, out SignCacheInfo cacheTo) == false)
             {
                 connection.Write(Helper.FalseArray);
                 return;
             }
 
-            List<WhiteListInfo> list = await whiteListServerStore.Get(type, cache.UserId, [cache.MachineId]).ConfigureAwait(false);
-            WhiteListInfo info = list.FirstOrDefault(c => c.Bandwidth < 0) ?? list.FirstOrDefault(c => c.Bandwidth == 0) ?? list.OrderByDescending(c => c.Bandwidth).FirstOrDefault();
+            List<WhiteListInfo> list = await whiteListServerStore.Get(info.Key, [cacheTo.UserId], [cacheTo.MachineId]).ConfigureAwait(false);
+            WhiteListInfo result = list.FirstOrDefault(c => c.Bandwidth < 0) ?? list.FirstOrDefault(c => c.Bandwidth == 0) ?? list.OrderByDescending(c => c.Bandwidth).FirstOrDefault();
 
             connection.Write(serializer.Serialize(new WhiteListOrderStatusInfo
             {
                 Type = whiteListServerStore.Config.Type,
                 Enabled = orderTransfer.CheckEnabled(),
-                Info = info
+                Info = result
             }));
         }
 
@@ -119,7 +125,7 @@ namespace linker.messenger.wlist
         [MessengerId((ushort)WhiteListMessengerIds.AddOrder)]
         public async Task AddOrder(IConnection connection)
         {
-            KeyValuePair<string, string> kvp = serializer.Deserialize<KeyValuePair<string,string>>(connection.ReceiveRequestWrap.Payload.Span);
+            KeyValuePair<string, string> kvp = serializer.Deserialize<KeyValuePair<string, string>>(connection.ReceiveRequestWrap.Payload.Span);
 
             if (signCaching.TryGet(connection.Id, out SignCacheInfo cache) == false)
             {
@@ -128,6 +134,28 @@ namespace linker.messenger.wlist
             }
 
             connection.Write(serializer.Serialize(await orderTransfer.AddOrder(cache.UserId, cache.MachineId, kvp.Key, kvp.Value)));
+        }
+
+
+        /// <summary>
+        /// 列表
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        [MessengerId((ushort)WhiteListMessengerIds.List)]
+        public async Task List(IConnection connection)
+        {
+            KeyValuePair<string, List<string>> info = serializer.Deserialize<KeyValuePair<string, List<string>>>(connection.ReceiveRequestWrap.Payload.Span);
+            List<string> userids = signCaching.GetUserIds(info.Value);
+
+            List<WhiteListInfo> whites = await whiteListServerStore.Get(info.Key, userids, info.Value).ConfigureAwait(false);
+
+            var result = whites.Where(c => string.IsNullOrWhiteSpace(c.UserId) == false).GroupBy(c => c.UserId)
+                .ToDictionary(c => $"u_{c.Key}", v => v.Select(c => c).ToDictionary(x => x.Id, x => x.Bandwidth))
+                .Concat(whites.Where(c => string.IsNullOrWhiteSpace(c.MachineId) == false).GroupBy(c => c.MachineId)
+                .ToDictionary(c => $"m_{c.Key}", v => v.Select(c => c).ToDictionary(x => x.Id, x => x.Bandwidth)))
+                .ToDictionary();
+            connection.Write(serializer.Serialize(result));
         }
     }
 }

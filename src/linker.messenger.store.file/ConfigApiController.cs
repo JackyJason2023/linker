@@ -4,7 +4,6 @@ using linker.libs;
 using linker.messenger.signin;
 using linker.messenger.api;
 using System.Text;
-using linker.messenger.relay.client.transport;
 using System.Text.Json;
 using System.Collections;
 using linker.libs.web;
@@ -15,40 +14,38 @@ namespace linker.messenger.store.file
         private readonly RunningConfig runningConfig;
         private readonly FileConfig config;
         private readonly SignInClientTransfer signInClientTransfer;
-        private readonly IMessengerSender sender;
         private readonly SignInClientState signInClientState;
-        private readonly IApiStore apiStore;
         private readonly ExportResolver exportResolver;
         private readonly IAccessStore accessStore;
 
-        public ConfigApiController(RunningConfig runningConfig, FileConfig config, SignInClientTransfer signInClientTransfer, IMessengerSender sender, SignInClientState signInClientState,
-            IApiStore apiStore, ExportResolver exportResolver, IAccessStore accessStore)
+        public ConfigApiController(RunningConfig runningConfig, FileConfig config, SignInClientTransfer signInClientTransfer,
+            SignInClientState signInClientState, ExportResolver exportResolver, IAccessStore accessStore)
         {
             this.runningConfig = runningConfig;
             this.config = config;
             this.signInClientTransfer = signInClientTransfer;
-            this.sender = sender;
             this.signInClientState = signInClientState;
-            this.apiStore = apiStore;
             this.exportResolver = exportResolver;
             this.accessStore = accessStore;
         }
 
         public ConfigListInfo Get(ApiControllerParamsInfo param)
         {
-            ulong hashCode = ulong.Parse(param.Content);
-            if (config.Data.DataVersion.Eq(hashCode, out ulong version) == false)
-            {
-                return new ConfigListInfo
-                {
-                    HashCode = version,
-                    List = new { Common = config.Data.Common, Client = config.Data.Client, Server = config.Data.Server, Running = runningConfig.Data }
-                };
-            }
+            GetConfigParamsInfo info = param.Content.DeJson<GetConfigParamsInfo>();
+
+            bool eq = config.Data.DataVersion.Eq(info.HashCode, out ulong version),
+                eq1 = runningConfig.Data.DataVersion.Eq(info.HashCode1, out ulong version1);
             return new ConfigListInfo
             {
                 HashCode = version,
-                List = new { Running = runningConfig.Data }
+                HashCode1 = version1,
+                List = new Dictionary<string, object>
+                {
+                    { "Common" ,eq ? null : config.Data.Common },
+                    { "Client" ,eq ? null : config.Data.Client },
+                    { "Server" ,eq ? null : config.Data.Server },
+                    { "Running" ,eq1 ? null : runningConfig.Data}
+                }
             };
         }
         public bool Install(ApiControllerParamsInfo param)
@@ -80,8 +77,8 @@ namespace linker.messenger.store.file
                 config.Data.Server.SignIn.Anonymous = info.Server.Anonymous;
                 config.Data.Server.SignIn.SuperKey = info.Server.SuperKey;
                 config.Data.Server.SignIn.SuperPassword = info.Server.SuperPassword;
-                config.Data.Server.SForward.WebPort = info.Server.SForward.WebPort;
-                config.Data.Server.SForward.TunnelPortRange = info.Server.SForward.TunnelPortRange;
+                //config.Data.Server.SForward.WebPort = info.Server.SForward.WebPort;
+                //config.Data.Server.SForward.TunnelPorts = info.Server.SForward.TunnelPorts;
             }
 
             config.Data.Common.Modes = info.Common.Modes;
@@ -265,9 +262,6 @@ namespace linker.messenger.store.file
             client.AccessBits = accessStore.AssignAccess(configExportInfo.Access);
             client.FullAccess = configExportInfo.FullAccess && config.Data.Client.FullAccess;
 
-            if (configExportInfo.Relay) client.Relay = new RelayClientInfo { Servers = [client.Relay.Servers[0]] };
-            else client.Relay = new RelayClientInfo { Servers = [new RelayServerInfo { }] };
-
             if (configExportInfo.Server)
             {
                 client.Server.Host = config.Data.Client.Server.Host;
@@ -289,9 +283,6 @@ namespace linker.messenger.store.file
             if (configExportInfo.Updater) client.Updater = new linker.messenger.updater.UpdaterConfigClientInfo { Sync2Server = client.Updater.Sync2Server };
             else client.Updater = new linker.messenger.updater.UpdaterConfigClientInfo { };
 
-            if (configExportInfo.Tunnel) client.Tunnel = new TunnelConfigClientInfo { Transports = client.Tunnel.Transports };
-            else client.Tunnel = new TunnelConfigClientInfo { Transports = new List<linker.tunnel.transport.TunnelTransportItemInfo>() };
-
             ConfigCommonInfo common = config.Data.Common.ToJson().DeJson<ConfigCommonInfo>();
             common.Install = true;
             common.Modes = ["client"];
@@ -306,17 +297,77 @@ namespace linker.messenger.store.file
                 Groups = new SignInClientGroupInfo[] { client.Group },
                 Servers = new SignInClientServerInfo[] { client.Server },
                 client.Updater,
-                Relay = new { Servers = new RelayServerInfo[] { client.Relay.Server } },
-                client.Tunnel,
             }, common, new { Install = true, Modes = new string[] { "client" } });
         }
 
+        [Access(AccessValue.Export)]
+        public string ShareGroup(ApiControllerParamsInfo param)
+        {
+            ICrypto crypto = CryptoFactory.CreateSymmetric(Helper.GlobalString);
+
+            try
+            {
+                return Convert.ToBase64String(crypto.Encode(new ShareGroupInfo
+                {
+                    Server = config.Data.Client.Server.Host,
+                    Id = config.Data.Client.Group.Id,
+                    Pwd = config.Data.Client.Group.Password
+                }.ToJson().ToBytes()));
+            }
+            catch (Exception)
+            {
+            }
+            finally
+            {
+                crypto.Dispose();
+            }
+            return string.Empty;
+        }
+        public bool JoinGroup(ApiControllerParamsInfo param)
+        {
+            ICrypto crypto = CryptoFactory.CreateSymmetric(Helper.GlobalString);
+
+            try
+            {
+                ShareGroupInfo info = crypto.Decode(Convert.FromBase64String(param.Content)).GetString().DeJson<ShareGroupInfo>();
+                config.Data.Client.Server.Host = info.Server;
+                config.Data.Client.Group.Id = info.Id;
+                config.Data.Client.Group.Password = info.Pwd;
+                config.Data.Update();
+
+                signInClientTransfer.ReSignIn();
+                return true;
+            }
+            catch (Exception)
+            {
+            }
+            finally
+            {
+                crypto.Dispose(); 
+            }
+
+            return false;
+        }
+    }
+
+    public sealed class ShareGroupInfo
+    {
+        public string Server { get; set; }
+        public string Id { get; set; }
+        public string Pwd { get; set; }
+    }
+
+    public sealed class GetConfigParamsInfo
+    {
+        public ulong HashCode { get; set; }
+        public ulong HashCode1 { get; set; }
     }
 
     public sealed class ConfigListInfo
     {
-        public object List { get; set; }
+        public Dictionary<string, object> List { get; set; }
         public ulong HashCode { get; set; }
+        public ulong HashCode1 { get; set; }
     }
 
     public sealed class InstallSaveInfo
@@ -362,7 +413,7 @@ namespace linker.messenger.store.file
     public sealed class ConfigInstallServerSForwardInfo
     {
         public int WebPort { get; set; }
-        public int[] TunnelPortRange { get; set; }
+        public string TunnelPorts { get; set; }
     }
 
     public sealed class ConfigInstallCommonInfo

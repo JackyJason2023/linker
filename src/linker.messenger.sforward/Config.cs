@@ -54,34 +54,14 @@ namespace linker.messenger.sforward
         /// </summary>
         public int RemotePortMax { get; set; }
 
-
-    }
-
-    public sealed class SForwardInfo191 : SForwardInfo
-    {
+        /// <summary>
+        /// 191+
+        /// </summary>
         public string NodeId { get; set; } = string.Empty;
         public string NodeId1 { get; set; } = string.Empty;
     }
 
-    public sealed class SForwardConfigServerInfo
-    {
-        /// <summary>
-        /// web端口
-        /// </summary>
-        public int WebPort { get; set; }
-        /// <summary>
-        /// 开放端口范围
-        /// </summary>
-        public int[] TunnelPortRange { get; set; } = new int[] { 10000, 60000 };
-
-        public DistributedInfo Distributed { get; set; } = new DistributedInfo { };
-    }
-    public sealed class DistributedInfo
-    {
-        public SForwardServerNodeInfo Node { get; set; } = new SForwardServerNodeInfo { };
-        public SForwardServerMasterInfo Master { get; set; } = new SForwardServerMasterInfo { };
-    }
-
+   
     /// <summary>
     /// 往服务器添加穿透
     /// </summary>
@@ -95,11 +75,9 @@ namespace linker.messenger.sforward
         /// 或者端口。域名优先
         /// </summary>
         public int RemotePort { get; set; }
-    }
-    public sealed partial class SForwardAddInfo191 : SForwardAddInfo
-    {
+
         /// <summary>
-        /// 节点id
+        /// 191+
         /// </summary>
         public string NodeId { get; set; } = string.Empty;
         public string MachineId { get; set; } = string.Empty;
@@ -108,7 +86,6 @@ namespace linker.messenger.sforward
         public bool Super { get; set; }
         public double Bandwidth { get; set; }
     }
-
     /// <summary>
     /// 添加穿透结果
     /// </summary>
@@ -132,10 +109,6 @@ namespace linker.messenger.sforward
     {
         public string MachineId { get; set; }
         public SForwardInfo Data { get; set; }
-    }
-    public sealed partial class SForwardAddForwardInfo191 : SForwardAddForwardInfo
-    {
-        public new SForwardInfo191 Data { get; set; }
     }
     public sealed partial class SForwardRemoveForwardInfo
     {
@@ -171,11 +144,4 @@ namespace linker.messenger.sforward
         public IPAddress Addr { get; set; }
     }
 
-
-
-    public sealed partial class SForwardCountInfo
-    {
-        public string MachineId { get; set; }
-        public int Count { get; set; }
-    }
 }

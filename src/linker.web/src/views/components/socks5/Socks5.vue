@@ -1,34 +1,33 @@
 <template>
-    <el-table-column prop="socks5" :label="socks5.show?$t('home.proxy'):''" width="160">
+    <el-table-column prop="socks5" :label="$t('home.proxy')" width="160">
         <template #default="scope">
-            <div v-if="socks5.show && socks5.list[scope.row.MachineId]">
-                <Socks5Show :config="true" :item="scope.row" @edit="handleSocks5" @refresh="handleSocks5Refresh"></Socks5Show>
-            </div> 
+            <template v-if="scope.row &&scope.row.hook_socks5">
+                <div class="skeleton-animation" :style="`animation-delay:${scope.row.animationDelay}ms`">
+                    <Socks5Show :config="true" :item="scope.row"></Socks5Show>
+                </div>
+            </template>
+            <template v-else-if="scope.row &&!scope.row.hook_socks5_load">
+                <div class="skeleton-animation">
+                    <el-skeleton animated >
+                        <template #template>
+                            <el-skeleton-item variant="text" style="width: 60%;" />
+                            <el-skeleton-item variant="text" style="width: 20%;margin-left:20%" />
+                        </template>
+                    </el-skeleton>
+                </div>
+            </template>
+            <div class="device-remark"></div>
         </template>
     </el-table-column>
 </template>
 <script>
-import { useSocks5 } from './socks5';
 import Socks5Show from './Socks5Show.vue';
 export default {
     emits: ['edit','refresh'],
     components:{Socks5Show},
-    setup(props, { emit }) {
+    setup() {
 
-        const socks5 = useSocks5();
-
-        const handleSocks5 = (_socks5) => {
-            socks5.value.current = _socks5;
-            socks5.value.showEdit = true;
-        }
-        const handleSocks5Refresh = ()=>{
-            emit('refresh');
-        }
-
-       
-        return {
-            socks5, handleSocks5,handleSocks5Refresh
-        }
+        return {}
     }
 }
 </script>

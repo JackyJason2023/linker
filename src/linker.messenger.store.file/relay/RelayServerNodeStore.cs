@@ -1,56 +1,72 @@
 ﻿using linker.messenger.relay.server;
+using LiteDB;
 
 namespace linker.messenger.store.file.relay
 {
-    public sealed class RelayServerNodeStore : IRelayServerNodeStore
+    public sealed class RelayServerNodeStore : IRelayNodeStore
     {
-        public int ServicePort => config.Data.Server.ServicePort;
-        public RelayServerNodeInfo Node => config.Data.Server.Relay.Distributed.Node;
-
-        private readonly FileConfig config;
-        public RelayServerNodeStore(FileConfig config)
+        private readonly ILiteCollection<RelayServerNodeStoreInfo> liteCollection;
+        public RelayServerNodeStore(Storefactory storefactory)
         {
-            this.config = config;
+            liteCollection = storefactory.GetCollection<RelayServerNodeStoreInfo>($"relay_server_master");
         }
 
-        public void Confirm()
+        public async Task<bool> Add(RelayServerNodeStoreInfo info)
         {
-            config.Data.Update();
+            if (liteCollection.FindOne(c => c.NodeId == info.NodeId) != null)
+            {
+                return false;
+            }
+            liteCollection.Insert(info);
+            return await Task.FromResult(true).ConfigureAwait(false);
         }
 
-        public void SetInfo(RelayServerNodeInfo node)
+        public async Task<bool> Delete(string nodeId)
         {
-            config.Data.Server.Relay.Distributed.Node = node;
-        }
-        public void UpdateInfo(RelayServerNodeUpdateInfo188 update)
-        {
-            config.Data.Server.Relay.Distributed.Node.Name = update.Name;
-            config.Data.Server.Relay.Distributed.Node.MaxConnection = update.MaxConnection;
-            config.Data.Server.Relay.Distributed.Node.MaxBandwidth = update.MaxBandwidth;
-            config.Data.Server.Relay.Distributed.Node.MaxBandwidthTotal = update.MaxBandwidthTotal;
-            config.Data.Server.Relay.Distributed.Node.MaxGbTotal = update.MaxGbTotal;
-            config.Data.Server.Relay.Distributed.Node.MaxGbTotalLastBytes = update.MaxGbTotalLastBytes;
-            config.Data.Server.Relay.Distributed.Node.Public = update.Public;
-            config.Data.Server.Relay.Distributed.Node.Url = update.Url;
-            config.Data.Server.Relay.Distributed.Node.AllowTcp = update.AllowTcp;
-            config.Data.Server.Relay.Distributed.Node.AllowUdp = update.AllowUdp;
-            config.Data.Server.Relay.Distributed.Node.Sync2Server = update.Sync2Server;
-
-        }
-        public void SetMasterHosts(string[] hosts)
-        {
-            config.Data.Server.Relay.Distributed.Node.MasterHosts = hosts;
-        }
-        public void SetMaxGbTotalLastBytes(long value)
-        {
-            config.Data.Server.Relay.Distributed.Node.MaxGbTotalLastBytes = value;
+            return await Task.FromResult(liteCollection.DeleteMany(c => c.NodeId == nodeId) > 0).ConfigureAwait(false);
         }
 
-        public void SetMaxGbTotalMonth(int month)
+        public async Task<List<RelayServerNodeStoreInfo>> GetAll()
         {
-            config.Data.Server.Relay.Distributed.Node.MaxGbTotalMonth = month;
+            return await Task.FromResult(liteCollection.FindAll().ToList()).ConfigureAwait(false);
         }
 
+        public async Task<RelayServerNodeStoreInfo> GetByNodeId(string nodeId)
+        {
+            return await Task.FromResult(liteCollection.FindOne(c => c.NodeId == nodeId)).ConfigureAwait(false);
+        }
+        public async Task<bool> Report(RelayServerNodeReportInfo info)
+        {
+            int length = liteCollection.UpdateMany(p => new RelayServerNodeStoreInfo
+            {
+                LastTicks = Environment.TickCount64,
+                Bandwidth = info.Bandwidth,
+                Connections = info.Connections,
+                Version = info.Version,
+                ConnectionsRatio = info.ConnectionsRatio,
+                BandwidthRatio = info.BandwidthRatio,
+                Url = info.Url,
+                Logo = info.Logo,
+                DataEachMonth = info.DataEachMonth,
+                DataRemain = info.DataRemain,
+                Name = info.Name,
+                Protocol = info.Protocol,
+                MasterCount = info.MasterCount,
+            }, c => c.NodeId == info.NodeId);
 
+            return await Task.FromResult(length > 0).ConfigureAwait(false);
+        }
+
+        public async Task<bool> Update(RelayServerNodeStoreInfo info)
+        {
+            int length = liteCollection.UpdateMany(p => new RelayServerNodeStoreInfo
+            {
+                Public = info.Public,
+                Host = info.Host,
+                BandwidthEach = info.BandwidthEach,
+            }, c => c.NodeId == info.NodeId);
+
+            return await Task.FromResult(length > 0).ConfigureAwait(false); ;
+        }
     }
 }

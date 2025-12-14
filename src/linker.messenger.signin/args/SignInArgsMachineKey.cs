@@ -20,6 +20,8 @@ namespace linker.messenger.signin.args
             }
 
             args.TryAdd("machineKey", machineKey);
+            args.TryAdd("machineStr", SystemIdHelper.GetSystemStr());
+
             return await Task.FromResult(string.Empty);
         }
     }
@@ -54,7 +56,5 @@ namespace linker.messenger.signin.args
             }
             return await Task.FromResult(string.Empty);
         }
-
-
     }
 }

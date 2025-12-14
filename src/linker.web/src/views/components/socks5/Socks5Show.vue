@@ -1,50 +1,57 @@
 <template>
     <AccessBoolean value="Socks5ChangeSelf,Socks5ChangeOther,Socks5StatusSelf,Socks5StatusOther">
         <template #default="{values}">
-            <div>
-                <div class="flex">
-                    <div class="flex-1">
-                        <ConnectionShow :data="connections.list[item.MachineId]" :row="item" transitionId="socks5"></ConnectionShow>
-                        <a href="javascript:;" class="a-line" @click="handleSocks5Port(socks5.list[item.MachineId],values)" title="此设备的socks5代理">
-                            <template v-if="socks5.list[item.MachineId].SetupError">
-                                <strong class="red" :title="socks5.list[item.MachineId].SetupError">
-                                    socks5://*:{{ socks5.list[item.MachineId].Port }}
-                                </strong>
+            <div class="flex">
+                <div class="flex-1">
+                    <ConnectionShow :row="item" transactionId="socks5"></ConnectionShow>
+                    <a href="javascript:;" class="a-line" @click="handleSocks5Port(item.hook_socks5,values)" title="此设备的socks5代理">
+                        <template v-if="item.hook_socks5.SetupError">
+                            <strong class="red" :title="item.hook_socks5.SetupError">
+                                socks5://*:{{ item.hook_socks5.Port }}
+                            </strong>
+                        </template>
+                        <template v-else>
+                            <template v-if="item.Connected &&item.hook_socks5.running">
+                                <strong class="green gateway">socks5://*:{{ item.hook_socks5.Port }}</strong>
                             </template>
                             <template v-else>
-                                <template v-if="item.Connected &&socks5.list[item.MachineId].running">
-                                    <strong class="green gateway">socks5://*:{{ socks5.list[item.MachineId].Port }}</strong>
-                                </template>
-                                <template v-else>
-                                    <span>socks5://*:{{ socks5.list[item.MachineId].Port }}</span>
-                                </template>
-                            </template>
-                        </a>
-                    </div>
-                    <template v-if="socks5.list[item.MachineId].loading">
-                        <div>
-                            <el-icon size="14" class="loading"><Loading /></el-icon>
-                        </div>
-                    </template>
-                    <template v-else>
-                        <el-switch :model-value="item.Connected && socks5.list[item.MachineId].running" :loading="socks5.list[item.MachineId].loading" disabled @click="handleSocks5(socks5.list[item.MachineId],values)"  size="small" inline-prompt active-text="😀" inactive-text="😣" > 
-                        </el-switch>
-                    </template>
-                </div>
-                <div>
-                    <div>
-                        <template v-for="(item1,index) in  socks5.list[item.MachineId].Lans" :key="index">
-                            <template v-if="item1.Disabled">
-                                <div class="flex disable" title="已禁用">{{ item1.IP }} / {{ item1.PrefixLength }}</div>
-                            </template>
-                            <template v-else-if="item1.Exists">
-                                <div class="flex yellow" title="与其它设备填写IP、或本机局域网IP有冲突">{{ item1.IP }} / {{ item1.PrefixLength }}</div>
-                            </template>
-                            <template v-else>
-                                <div class="flex green" title="正常使用" :class="{green:item.Connected &&socks5.list[item.MachineId].running}">{{ item1.IP }} / {{ item1.PrefixLength }}</div>
+                                <span>socks5://*:{{ item.hook_socks5.Port }}</span>
                             </template>
                         </template>
+                    </a>
+                </div>
+                <template v-if="item.hook_socks5.loading">
+                    <div>
+                        <el-icon size="14" class="loading"><Loading /></el-icon>
                     </div>
+                </template>
+                <template v-else>
+                    <el-switch :model-value="item.Connected && item.hook_socks5.running" :loading="item.hook_socks5.loading" disabled @click="handleSocks5(item.hook_socks5,values)"  size="small" inline-prompt active-text="😀" inactive-text="😣" > 
+                    </el-switch>
+                </template>
+            </div>
+            <div>
+                <div>
+                    <template v-for="(item1,index) in  item.hook_socks5.Lans" :key="index">
+                        <template v-if="item1.Disabled">
+                            <div class="flex disable" title="已禁用">
+                                <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
+                                <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
+                            </div>
+                        </template>
+                        <template v-else-if="item1.Exists">
+                            <div class="flex yellow" title="与其它设备填写IP、或本机局域网IP有冲突">
+                                <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
+                                <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div class="flex green" title="正常使用" :class="{green:item.Connected && item.hook_socks5.running}">
+                                <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
+                                <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
+                            </div>
+                        </template>
+                    </template>
                 </div>
             </div>
         </template>
@@ -58,24 +65,21 @@ import { useSocks5 } from './socks5';
 import {Loading} from '@element-plus/icons-vue'
 import { injectGlobalData } from '@/provide';
 import { computed } from 'vue';
-import { useSocks5Connections } from '../connection/connections';
-import ConnectionShow from '../connection/ConnectionShow.vue';
+import ConnectionShow from '../tunnel/ConnectionShow.vue';
 export default {
     props:['item','config'],
-    emits: ['edit','refresh'],
     components:{Loading,ConnectionShow},
-    setup (props,{emit}) {
+    setup (props) {
         
         const socks5 = useSocks5();
         const globalData = injectGlobalData();
         const machineId = computed(() => globalData.value.config.Client.Id);
-        const connections = useSocks5Connections();
 
-        const handleSocks5 = (socks5,access) => {
+        const handleSocks5 = (_socks5,access) => {
             if(!props.config){
                 return;
             }
-            if(machineId.value === socks5.MachineId){
+            if(machineId.value === _socks5.MachineId){
                 if(!access.Socks5StatusSelf){
                 ElMessage.success('无权限');
                 return;
@@ -86,8 +90,8 @@ export default {
                 return;
             }
             }
-            const fn = props.item.Connected && socks5.running ? stopSocks5 (socks5.MachineId) : runSocks5(socks5.MachineId);
-            socks5.loading = true;
+            const fn = props.item.Connected && _socks5.running ? stopSocks5 (_socks5.MachineId) : runSocks5(_socks5.MachineId);
+            _socks5.loading = true;
             fn.then(() => {
                 ElMessage.success('操作成功！');
             }).catch((err) => {
@@ -95,11 +99,11 @@ export default {
                 ElMessage.error('操作失败！');
             })
         }
-        const handleSocks5Port = (socks5,access) => {
-            if(!props.config && machineId.value != socks5.MachineId){
+        const handleSocks5Port = (_socks5,access) => {
+            if(!props.config && machineId.value != _socks5.MachineId){
                 return;
             }
-            if(machineId.value === socks5.MachineId){
+            if(machineId.value === _socks5.MachineId){
                 if(!access.Socks5ChangeSelf){
                 ElMessage.success('无权限');
                 return;
@@ -110,15 +114,13 @@ export default {
                 return;
             }
             }
-            socks5.device = props.item;
-            emit('edit',socks5);
-        }
-        const handleSocks5Refresh = ()=>{
-            emit('refresh');
+            _socks5.device = props.item;
+            socks5.value.current = _socks5;
+            socks5.value.showEdit = true;
         }
 
         return {
-            item:computed(()=>props.item),socks5,connections,  handleSocks5, handleSocks5Port,handleSocks5Refresh
+            socks5, handleSocks5, handleSocks5Port,
         }
     }
 }
@@ -138,6 +140,16 @@ export default {
 .el-switch.is-disabled{opacity :1;}
 .el-input{
     width:8rem;
+}
+
+.remark{
+    padding-left:.4rem;
+    text-align:right;
+    white-space: nowrap;      /* 禁止换行 */
+    overflow: hidden;         /* 隐藏超出部分 */
+    text-overflow: ellipsis;  /* 显示省略号 */
+    max-width: 100%;
+    color:#666;
 }
 
 .switch-btn{

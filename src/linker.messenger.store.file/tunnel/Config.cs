@@ -1,6 +1,5 @@
 ﻿using linker.messenger.tunnel;
 using linker.tunnel.transport;
-using LiteDB;
 namespace linker.messenger.store.file
 {
     public sealed partial class RunningConfigInfo
@@ -14,7 +13,6 @@ namespace linker.messenger.store.file
     public sealed class TunnelRunningInfo
     {
         public TunnelRunningInfo() { }
-        public ObjectId Id { get; set; }
         /// <summary>
         /// 附加的网关层级
         /// </summary>
@@ -24,18 +22,8 @@ namespace linker.messenger.store.file
         public int PortMapLan { get; set; }
 
         public TunnelPublicNetworkInfo Network { get; set; } = new TunnelPublicNetworkInfo();
+        public Dictionary<string, List<TunnelTransportItemInfo>> Transports { get; set; } = new Dictionary<string, List<TunnelTransportItemInfo>>();
     }
 
-    public partial class ConfigClientInfo
-    {
-        public TunnelConfigClientInfo Tunnel { get; set; } = new TunnelConfigClientInfo();
-    }
-    public sealed class TunnelConfigClientInfo
-    {
-        /// <summary>
-        /// 打洞协议列表
-        /// </summary>
-        public List<TunnelTransportItemInfo> Transports { get; set; } = new List<TunnelTransportItemInfo>();
-    }
 }
 

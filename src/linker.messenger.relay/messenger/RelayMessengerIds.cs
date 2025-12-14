@@ -4,46 +4,39 @@
     {
         Min = 2100,
 
-        Relay = 2101,
-        RelayForward = 2102,
-
-        RelayAsk = 2103,
-        RelayConfirm = 2104,
+        Ask = 2103,
 
         Nodes = 2105,
 
-        NodeDelay = 2106,
-        NodeDelayForward = 2107,
+        GetCache = 2112,
+        NodeReport = 2128,
 
+        SignIn = 2134,
+        Report = 2135,
 
-        NodeGetCache = 2112,
-        NodeReport = 2113,
-        TrafficReport = 2114,
+        Share = 2136,
+        ShareForward = 2137,
+        Import = 2138,
+        Remove = 2139,
 
-        Edit = 2117,
-        EditForward = 2118,
+        UpdateForward = 2140,
+        Update = 2141,
 
-        Nodes170 = 2119,
-        RelayAsk170 = 2120,
-        RelayForward170 = 2121,
+        ExitForward = 2142,
+        Exit = 2143,
 
-        SendLastBytes = 2122,
+        UpgradeForward = 2144,
+        Upgrade = 2145,
 
-        NodeGetCache186 = 2124,
+        MastersForward = 2146,
+        Masters = 2147,
 
-        Exit = 2125,
-        ExitForward = 2126,
-
-        Nodes188 = 2127,
-        NodeReport188 = 2128,
-
-        Update = 2129,
-        UpdateForward = 2130,
-
-        Edit188 = 2131,
-        EditForward188 = 2132,
-
-        Hosts = 2133,
+        DenysForward = 2148,
+        Denys = 2149,
+        DenysAddForward = 2150,
+        DenysAdd = 2151,
+        DenysDelForward = 2152,
+        DenysDel = 2153,
 
         Max = 2199
     }

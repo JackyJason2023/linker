@@ -1,35 +1,40 @@
 <template>
-<el-table-column prop="MachineId" :label="$t('home.device')" width="220">
+<el-table-column prop="MachineId" :label="$t('home.device')" width="180">
     <template #header>
         <div class="flex">
-            <span class="flex-1">{{$t('home.device')}}</span>
-            <span> <el-input v-trim size="small" v-model="name" clearable @input="handleRefresh" ></el-input> </span>
-            <span>
-                <el-button size="small" @click="handleRefresh"><el-icon><Search /></el-icon></el-button>
-            </span>
+            <span>{{$t('home.device')}}</span>
+            <span class="flex-1"> <el-input v-trim size="small" v-model="name" clearable @input="handleRefresh" class="w-100" ></el-input> </span>
         </div>
     </template>
     <template #default="scope">
-        <div>
+        <template v-if="scope.row">
             <p>
                 <DeviceName :config="true" :item="scope.row"></DeviceName>
             </p>
             <p class="flex">
                 <template v-if="scope.row.Connected">
-                    <template v-if="scope.row.showip">
-                        <span :title="$t('home.deviceWanIP')" class="ipaddress" @click="handleExternal(scope.row)"><span>😀{{ scope.row.IP }}</span></span>
-                    </template>
-                    <template v-else>
-                        <span :title="$t('home.deviceWanIP')" class="ipaddress" @click="handleExternal(scope.row)"><span>😴㊙.㊙.㊙.㊙</span></span>
-                    </template>
-                    <span class="flex-1"></span>
-                    <UpdaterBtn v-if="scope.row.showip == false" :config="true" :item="scope.row"></UpdaterBtn>
+                    <SystemInfo :item="scope.row"></SystemInfo>
+                    <WlistShow type="Relay" :item="scope.row"></WlistShow>
+                    <UpdaterBtn :config="true" :item="scope.row"></UpdaterBtn>
+                </template>
+                <template v-else-if="scope.row.LastSignIn">
+                    <span>{{ scope.row.LastSignIn }} - {{ scope.row.Version }}</span>
                 </template>
                 <template v-else>
-                    <span>{{ scope.row.LastSignIn }}</span>
+                    <el-skeleton animated >
+                        <template #template>
+                            <div class="flex">
+                                <el-skeleton-item variant="text" class="el-skeleton-item" />
+                                <el-skeleton-item variant="text" class="el-skeleton-item" />
+                                <span class="flex-1"></span>
+                                <el-skeleton-item variant="text" class="el-skeleton-item" />
+                            </div>
+                        </template>
+                    </el-skeleton>
                 </template>
             </p>
-        </div>
+        </template>
+        <div class="device-remark"></div>
     </template>
 </el-table-column>
 </template>
@@ -38,39 +43,34 @@ import { ref } from 'vue';
 import {Search} from '@element-plus/icons-vue'
 import UpdaterBtn from '../updater/UpdaterBtn.vue';
 import DeviceName from './DeviceName.vue';
-import { useI18n } from 'vue-i18n';
+import SystemInfo from '../tuntap/SystemInfo.vue'; 
+import WlistShow from '../wlist/Device.vue'
+
 
 export default {
     emits:['refresh'],
-    components:{Search,UpdaterBtn,DeviceName},
+    components:{Search,UpdaterBtn,DeviceName,SystemInfo,WlistShow},
     setup(props,{emit}) {
 
-        const t = useI18n();
         const name = ref(sessionStorage.getItem('search-name') || '');
         
-        const handleExternal = (row)=>{
-            row.showip=!row.showip;
-        }
         const handleRefresh = ()=>{
             sessionStorage.setItem('search-name',name.value);
             emit('refresh',name.value)
         }
 
         return {
-             handleRefresh,name,handleExternal
+            name, handleRefresh
         }
     }
 }
 </script>
 <style lang="stylus" scoped>
-
-.ipaddress{
-    span{vertical-align:middle}
-}
-
 .el-input{
     width:12rem;
     margin-right:.6rem
 }
-
+.el-skeleton-item{
+    vertical-align: middle;width: 20%;
+}
 </style>

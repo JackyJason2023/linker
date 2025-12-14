@@ -1,0 +1,28 @@
+{
+    "docker-project":
+    {
+        "projects":
+        [
+            {
+                "name": "linker",
+                "path": "docker"
+            }
+        ]
+    },
+    "data-share":
+    {
+        "shares":
+        [
+            {
+                "name": "linker-docker",
+                "permission":
+                {
+                    "rw":
+                    [
+                        "linker-docker"
+                    ]
+                }
+            }
+        ]
+    }
+}
