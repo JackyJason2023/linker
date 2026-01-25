@@ -49,11 +49,11 @@ namespace linker.tunnel
             {
                 item.OnConnected = OnConnected;
             }
-            _ = RebuildTransports();
         }
-        private async Task RebuildTransports()
+
+        public void RebuildTransports()
         {
-            await tunnelMessengerAdapter.SetTunnelTransports(Helper.GlobalString, transports).ConfigureAwait(false);
+            _ = tunnelMessengerAdapter.SetTunnelTransports(Helper.GlobalString, transports).ConfigureAwait(false);
             if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                 LoggerHelper.Instance.Info($"load tunnel transport:{string.Join(",", transports.Select(c => c.GetType().Name))}");
         }
@@ -64,7 +64,6 @@ namespace linker.tunnel
             {
                 transport.OnConnected = OnConnected;
                 transports.Add(transport);
-                _ = RebuildTransports();
             }
         }
         public void AddProtocol(ITunnelWanPortProtocol protocol)
@@ -111,10 +110,11 @@ namespace linker.tunnel
                     using IMemoryOwner<byte> buffer = MemoryPool<byte>.Shared.Rent(16);
                     buffer.Memory.Span[0] = 255;
 
+                    using CancellationTokenSource cts = new CancellationTokenSource(1000);
                     var socket = new Socket(server.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                     try
                     {
-                        await socket.ConnectAsync(server).ConfigureAwait(false);
+                        await socket.ConnectAsync(server, cts.Token).ConfigureAwait(false);
                         await socket.SendAsync(buffer.Memory[..1]).ConfigureAwait(false);
                         return (socket.LocalEndPoint as IPEndPoint).Address;
                     }
@@ -255,7 +255,7 @@ namespace linker.tunnel
                                     FlowId = Interlocked.Increment(ref flowid),
                                 };
                                 OnConnecting(tunnelTransportInfo);
-                                ParseRemoteEndPoint(tunnelTransportInfo);
+                                ParseRemoteEndPoint(tunnelTransportInfo, transportItem.Addr);
                                 ITunnelConnection connection = await transport.ConnectAsync(tunnelTransportInfo).ConfigureAwait(false);
                                 if (connection != null)
                                 {
@@ -312,7 +312,7 @@ namespace linker.tunnel
                 {
                     transport.SetSSL(tunnelMessengerAdapter.Certificate);
                     OnConnectBegin(tunnelTransportInfo);
-                    ParseRemoteEndPoint(tunnelTransportInfo);
+                    ParseRemoteEndPoint(tunnelTransportInfo, item.Addr);
                     _ = transport.OnBegin(tunnelTransportInfo).ContinueWith((result) =>
                     {
                         operating.StopOperation(BuildKey(tunnelTransportInfo.Remote.MachineId, tunnelTransportInfo.TransactionId));
@@ -380,6 +380,11 @@ namespace linker.tunnel
                 LoggerHelper.Instance.Error($"wan port get ip is null");
                 return null;
             }
+            if (tunnelMessengerAdapter.InIp != null && IPAddress.Any.Equals(tunnelMessengerAdapter.InIp) == false)
+            {
+                ip.Remote.Address = tunnelMessengerAdapter.InIp;
+            }
+
             MapInfo portMapInfo = tunnelUpnpTransfer.PortMap ?? new MapInfo { PrivatePort = 0, PublicPort = 0 };
             return new TunnelTransportWanPortInfo
             {
@@ -436,7 +441,7 @@ namespace linker.tunnel
                 LoggerHelper.Instance.Error($"tunnel connect {tunnelTransportInfo.Remote.MachineId} fail");
         }
 
-        private void ParseRemoteEndPoint(TunnelTransportInfo tunnelTransportInfo)
+        private void ParseRemoteEndPoint(TunnelTransportInfo tunnelTransportInfo, Addrs addr)
         {
             if (tunnelTransportInfo.Local == null || tunnelTransportInfo.Remote == null) return;
 
@@ -484,6 +489,20 @@ namespace linker.tunnel
                 .Where(c => (c.Port == tunnelTransportInfo.Local.Local.Port && localLocalIps.Any(d => d.Equals(c.Address))) == false)
                 .Where(c => c.Address.Equals(IPAddress.Any) == false && c.Port > 0)
                 .ToList();
+
+
+            if (addr.HasFlag(Addrs.Ipv6) == false)
+            {
+                eps = eps.Where(c => c.AddressFamily != AddressFamily.InterNetworkV6).ToList();
+            }
+            if (addr.HasFlag(Addrs.Ipv4) == false)
+            {
+                eps = eps.Where(c => c.AddressFamily != AddressFamily.InterNetwork).ToList();
+            }
+            if (addr.HasFlag(Addrs.Lan) == false)
+            {
+                eps = eps.Where(c => tunnelTransportInfo.Remote.LocalIps.Contains(c.Address) == false).ToList();
+            }
 
             tunnelTransportInfo.RemoteEndPoints = eps;
         }

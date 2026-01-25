@@ -107,7 +107,7 @@ namespace linker.nat
                 using IMemoryOwner<byte> buffer1 = MemoryPool<byte>.Shared.Rent(8192);
                 using IMemoryOwner<byte> buffer2 = MemoryPool<byte>.Shared.Rent(8192);
 
-                await Task.WhenAll(
+                await Task.WhenAny(
                     CopyToAsync(buffer1.Memory, state.Source, state.Target),
                     CopyToAsync(buffer2.Memory, state.Target, state.Source)
                     ).ConfigureAwait(false);
@@ -161,8 +161,9 @@ namespace linker.nat
                     IPEndPoint ep = result.RemoteEndPoint as IPEndPoint;
                     (uint srcIp, ushort srcPort) key = (NetworkHelper.ToValue(ep.Address), (ushort)ep.Port);
                     if (dic.TryGetValue(key, out DstCacheInfo cache) == false) continue;
+                    cache.LastTime = Environment.TickCount64;
 
-                    (uint srcIp, ushort srcPort, uint dstIp, ushort dstPort) keyUdp = (NetworkHelper.ToValue(ep.Address), (ushort)ep.Port, cache.IP, cache.Port);
+                    (uint srcIp, ushort srcPort, uint dstIp, ushort dstPort) keyUdp = (key.srcIp, key.srcPort, cache.IP, cache.Port);
                     if (udpMap.TryGetValue(keyUdp, out UdpState state) == false)
                     {
                         state = new UdpState
@@ -175,7 +176,7 @@ namespace linker.nat
                         state.Target.WindowsUdpBug();
                         udpMap.AddOrUpdate(keyUdp, state, (a, b) => state);
                         await state.Target.SendToAsync(memory.Memory.Slice(0, result.ReceivedBytes), state.TargetEP);
-                        ConnectCallback(keyUdp, state);
+                        ConnectCallback(keyUdp, cache, state);
                     }
                     else
                     {
@@ -190,7 +191,7 @@ namespace linker.nat
                     Shutdown();
             }
         }
-        private async void ConnectCallback((uint srcIp, ushort srcPort, uint dstIp, ushort dstPort) keyUdp, UdpState state)
+        private async void ConnectCallback((uint srcIp, ushort srcPort, uint dstIp, ushort dstPort) keyUdp, DstCacheInfo cache, UdpState state)
         {
             try
             {
@@ -200,6 +201,7 @@ namespace linker.nat
                     SocketReceiveFromResult result = await state.Target.ReceiveFromAsync(memory.Memory, state.TargetEP);
                     if (result.ReceivedBytes == 0) continue;
 
+                    cache.LastTime = Environment.TickCount64;
                     await state.Source.SendToAsync(memory.Memory.Slice(0, result.ReceivedBytes), state.SourceEP);
                 }
             }
@@ -402,13 +404,19 @@ namespace linker.nat
         {
             TimerHelper.SetIntervalLong(() =>
             {
-                foreach (var item in dic.Where(c => c.Value.Fin && Environment.TickCount64 - c.Value.LastTime > 60 * 1000).Select(c => c.Key).ToList())
+                foreach (var key in dic.Where(c => c.Value.Fin && Environment.TickCount64 - c.Value.LastTime > c.Value.TimeOut).Select(c => c.Key).ToList())
                 {
-                    dic.TryRemove(item, out _);
+                    if (dic.TryRemove(key, out var cache))
+                    {
+                        if (udpMap.TryRemove((key.srcIp, (ushort)key.srcPort, cache.IP, cache.Port), out var udpCache))
+                        {
+                            udpCache.Target?.SafeClose();
+                        }
+                    }
                 }
-                foreach (var item in icmpMap.Where(c => Environment.TickCount64 - c.Value.LastTime > 30 * 1000).Select(c => c.Key).ToList())
+                foreach (var key in icmpMap.Where(c => Environment.TickCount64 - c.Value.LastTime > 30 * 1000).Select(c => c.Key).ToList())
                 {
-                    icmpMap.TryRemove(item, out _);
+                    icmpMap.TryRemove(key, out _);
                 }
             }, 30000);
         }
@@ -419,6 +427,8 @@ namespace linker.nat
             public uint IP { get; set; }
             public ushort Port { get; set; }
             public bool Fin { get; set; }
+
+            public long TimeOut { get; init; } = 60 * 1000;
         }
 
         sealed class TcpState

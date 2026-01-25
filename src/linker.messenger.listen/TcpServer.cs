@@ -1,5 +1,6 @@
 ﻿using linker.libs;
 using linker.libs.extends;
+using System;
 using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
@@ -11,11 +12,13 @@ namespace linker.messenger.listen
         private Socket socket;
         private Socket socketUdp;
         private CancellationTokenSource cancellationTokenSource;
-        private readonly ResolverTransfer resolverTransfer;
 
-        public TcpServer(ResolverTransfer resolverTransfer)
+        private readonly ResolverTransfer resolverTransfer;
+        private readonly CountryTransfer countryTransfer;
+        public TcpServer(ResolverTransfer resolverTransfer, CountryTransfer countryTransfer)
         {
             this.resolverTransfer = resolverTransfer;
+            this.countryTransfer = countryTransfer;
             cancellationTokenSource = new CancellationTokenSource();
 
         }
@@ -49,6 +52,11 @@ namespace linker.messenger.listen
                     IPEndPoint ep = result.RemoteEndPoint as IPEndPoint;
                     try
                     {
+                        if (countryTransfer.Test(buffer.Memory.Span[0], ep.Address) == false)
+                        {
+                            continue;
+                        }
+
                         await resolverTransfer.BeginReceive(socketUdp, ep, buffer.Memory.Slice(0, result.ReceivedBytes)).ConfigureAwait(false);
                     }
                     catch (Exception ex)
@@ -114,8 +122,42 @@ namespace linker.messenger.listen
         {
             if (e.AcceptSocket != null)
             {
-                _ = resolverTransfer.BeginReceive(e.AcceptSocket);
+                BeginReceive(e.AcceptSocket).ConfigureAwait(false);
                 StartAccept(e);
+            }
+        }
+        private async Task BeginReceive(Socket socket)
+        {
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(32);
+            using CancellationTokenSource cts = new CancellationTokenSource(5000);
+            try
+            {
+                if (socket == null || socket.RemoteEndPoint == null)
+                {
+                    return;
+                }
+
+                int length = await socket.ReceiveAsync(buffer.AsMemory(0, 1), SocketFlags.None, cts.Token).ConfigureAwait(false);
+                byte type = buffer[0];
+                if (countryTransfer.Test(type,(socket.RemoteEndPoint as IPEndPoint).Address) == false)
+                {
+                    cts.Cancel();
+                    socket.SafeClose();
+                    return;
+                }
+                _ = resolverTransfer.BeginReceive(type, socket);
+            }
+            catch (Exception ex)
+            {
+                cts.Cancel();
+                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                    LoggerHelper.Instance.Error(ex);
+
+                socket.SafeClose();
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
             }
         }
 

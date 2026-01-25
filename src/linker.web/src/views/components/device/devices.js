@@ -1,6 +1,6 @@
 import { getSignInList, setSignInOrder } from "@/apis/signin";
 import { injectGlobalData } from "@/provide";
-import { computed, inject, provide, reactive, ref } from "vue";
+import { computed, inject, nextTick, provide, reactive, ref } from "vue";
 
 const deviceSymbol = Symbol();
 export const provideDevices = () => {
@@ -74,7 +74,9 @@ export const provideDevices = () => {
                     }
                 }
             }
+            
             await Promise.all(Object.values(hooks).map(hook=>dataFn(hook)));
+
             devices.timer1 = setTimeout(fn,1000);
         }
         fn();
@@ -90,8 +92,15 @@ export const provideDevices = () => {
     const _getSignList = () => {
         return new Promise((resolve, reject) => { 
             getSignInList(devices.page.Request).then((res) => {
+                
+                if(!hasFullList.value)
+                {
+                    res.List = res.List.filter(c=>c.MachineId == machineId.value);
+                    res.Count = 1;
+                }
                 devices.page.Request = res.Request;
                 devices.page.Count = res.Count;
+                
                 for (let j in res.List) {
                     
                     Object.assign(res.List[j], {
@@ -104,13 +113,6 @@ export const provideDevices = () => {
                     if (res.List[j].isSelf) {
                         globalData.value.self = res.List[j];
                     }
-                    if(!hasFullList.value)
-                    {
-                        Object.assign(res.List[j], {
-                            MachineId:machineId.value == res.List[j].MachineId?res.List[j].MachineId:'',
-                            isHide:machineId.value != res.List[j].MachineId
-                        });
-                    }
                 }
                 devices.page.List = res.List;
                 for(let name in hooks) {
@@ -118,6 +120,9 @@ export const provideDevices = () => {
                 }
 
                 localStorage.setItem('device-count',devices.page.Count);
+                nextTick(()=>{
+                    window.dispatchEvent(new Event('resize'));
+                });
                 resolve()
             }).catch((err) => { resolve() });
         });

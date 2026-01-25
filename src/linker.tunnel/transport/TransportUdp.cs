@@ -176,7 +176,7 @@ namespace linker.tunnel.transport
             try
             {
                 //然后等待对方回复，如果能收到回复，就说明是通了
-                IPEndPoint remoteEP = await taskCompletionSource.Task.WaitAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+                IPEndPoint remoteEP = await taskCompletionSource.WithTimeout(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
                 return new TunnelConnectionUdp
                 {
                     UdpClient = remoteUdp,
@@ -203,9 +203,9 @@ namespace linker.tunnel.transport
                 {
                     LoggerHelper.Instance.Error(ex);
                 }
-                remoteUdp?.SafeClose();
+               
             }
-
+            remoteUdp?.SafeClose();
             return null;
         }
 
@@ -258,21 +258,23 @@ namespace linker.tunnel.transport
 
                 try
                 {
-                    AddressFamily af = await token.Tcs.Task.WaitAsync(TimeSpan.FromMilliseconds(30000)).ConfigureAwait(false);
+                    AddressFamily af = await token.Tcs.WithTimeout(TimeSpan.FromMilliseconds(30000)).ConfigureAwait(false);
                 }
                 catch (Exception)
                 {
+                    socket.SafeClose();
                     token.Tcs.TrySetResult(AddressFamily.InterNetwork);
                 }
+                return;
             }
             catch (Exception ex)
             {
-                socket.SafeClose();
                 if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                 {
                     LoggerHelper.Instance.Error(ex);
                 }
             }
+            socket.SafeClose();
         }
         private async Task ListenReceiveCallback(ListenAsyncToken token)
         {
@@ -365,7 +367,7 @@ namespace linker.tunnel.transport
 
             try
             {
-                ITunnelConnection connection = await tcs.Task.WaitAsync(TimeSpan.FromMilliseconds(5000)).ConfigureAwait(false);
+                ITunnelConnection connection = await tcs.WithTimeout(TimeSpan.FromMilliseconds(5000)).ConfigureAwait(false);
                 return connection;
             }
             catch (Exception)

@@ -116,7 +116,7 @@ namespace linker.messenger.node
             nodeConnectionTransfer.TryAdd(ConnectionSideType.Master, connection.Id, new ConnectionInfo
             {
                 Connection = connection,
-                Manageable = masterKey == Config.MasterKey
+                Manageable = masterKey == Config.MasterKey || shareKey == Config.ShareKeyManager
             });
 
             return true;
@@ -382,10 +382,6 @@ namespace linker.messenger.node
         public async Task<TStore> GetNode(string nodeId)
         {
             TStore node = await nodeStore.GetByNodeId(nodeId).ConfigureAwait(false);
-            if (node == null || Environment.TickCount64 - node.LastTicks > 15000)
-            {
-                return null;
-            }
             return node;
         }
 
@@ -396,13 +392,14 @@ namespace linker.messenger.node
         }
         private async Task BuildShareKey()
         {
+            using CancellationTokenSource cts = new CancellationTokenSource(5000);
             try
             {
                 string host = Config.Host;
                 if (string.IsNullOrWhiteSpace(host))
                 {
                     using HttpClient httpClient = new HttpClient();
-                    host = await httpClient.GetStringAsync($"https://linker.snltty.com/ip").WaitAsync(TimeSpan.FromMilliseconds(5000)).ConfigureAwait(false);
+                    host = await httpClient.GetStringAsync($"https://linker.snltty.com/ip", cts.Token).ConfigureAwait(false);
                 }
 
                 NodeShareInfo shareKeyInfo = new NodeShareInfo
@@ -430,6 +427,7 @@ namespace linker.messenger.node
                         Name = "default",
                         Host = $"{IPAddress.Loopback}:{nodeConfigStore.ServicePort}",
                         ShareKey = shareKeyManager,
+                        MasterKey = Config.MasterKey,
                         Manageable = true,
                     }).ConfigureAwait(false);
                 }
@@ -439,6 +437,7 @@ namespace linker.messenger.node
             }
             catch (Exception ex)
             {
+                cts.Cancel();
                 LoggerHelper.Instance.Error($"build {Name} share key error : {ex}");
             }
         }
@@ -509,34 +508,42 @@ namespace linker.messenger.node
                     {
                         var tasks = nodes.Select(async c =>
                         {
+                            using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(5000));
                             IPEndPoint remote = await NetworkHelper.GetEndPointAsync(c.Host, 1802).ConfigureAwait(false);
                             Socket socket = new Socket(remote.Address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                             socket.KeepAlive();
-                            await socket.ConnectAsync(remote).WaitAsync(TimeSpan.FromMilliseconds(5000)).ConfigureAwait(false);
-                            var connection = await messengerResolver.BeginReceiveClient(socket, true, (byte)ResolverType.NodeConnection, Helper.EmptyArray).ConfigureAwait(false);
+                            try
+                            {
 
-                            connection.Id = c.NodeId;
-                            var resp = await messengerSender.SendReply(new MessageRequestWrap
-                            {
-                                Connection = connection,
-                                MessengerId = MessengerIdSignIn,
-                                Payload = serializer.Serialize(new ValueTuple<string, string, string>(Config.NodeId, c.MasterKey, c.ShareKey)),
-                                Timeout = 5000
-                            }).ConfigureAwait(false);
-                            if (resp.Code == MessageResponeCodes.OK && resp.Data.Span.SequenceEqual(Helper.TrueArray))
-                            {
-                                LoggerHelper.Instance.Debug($"{Name} sign in to node {c.NodeId} success");
-                                nodeConnectionTransfer.TryAdd(ConnectionSideType.Node, c.NodeId, new ConnectionInfo
+                                await socket.ConnectAsync(remote, cts.Token).ConfigureAwait(false);
+                                var connection = await messengerResolver.BeginReceiveClient(socket, true, (byte)ResolverType.NodeConnection, Helper.EmptyArray).ConfigureAwait(false);
+
+                                connection.Id = c.NodeId;
+                                var resp = await messengerSender.SendReply(new MessageRequestWrap
                                 {
                                     Connection = connection,
-                                    Manageable = c.Manageable
-                                });
+                                    MessengerId = MessengerIdSignIn,
+                                    Payload = serializer.Serialize(new ValueTuple<string, string, string>(Config.NodeId, c.MasterKey, c.ShareKey)),
+                                    Timeout = 5000
+                                }).ConfigureAwait(false);
+                                if (resp.Code == MessageResponeCodes.OK && resp.Data.Span.SequenceEqual(Helper.TrueArray))
+                                {
+                                    LoggerHelper.Instance.Debug($"{Name} sign in to node {c.NodeId} success");
+                                    nodeConnectionTransfer.TryAdd(ConnectionSideType.Node, c.NodeId, new ConnectionInfo
+                                    {
+                                        Connection = connection,
+                                        Manageable = c.Manageable
+                                    });
+                                }
+                                else
+                                {
+                                    connection?.Disponse();
+                                }
                             }
-                            else
+                            catch (Exception)
                             {
-                                connection?.Disponse();
+                                socket.SafeClose();
                             }
-
                         });
                         await Task.WhenAll(tasks).ConfigureAwait(false);
                     }

@@ -28,12 +28,14 @@ namespace linker.messenger.store.file
         {
             byte[] buffer = ArrayPool<byte>.Shared.Rent(8 * 1024);
             Socket socket = new Socket(server.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+
+            using CancellationTokenSource cts = new CancellationTokenSource(5000);
             try
             {
-                await socket.ConnectAsync(server).WaitAsync(TimeSpan.FromMilliseconds(5000));
+                await socket.ConnectAsync(server, cts.Token);
 
                 buffer[0] = Type;
-                await socket.SendAsync(buffer.AsMemory(0,1));
+                await socket.SendAsync(buffer.AsMemory(0, 1));
 
                 byte[] playload = serializer.Serialize(new ExportSaveInfo { Type = ExportSaveType.Save, Value = value }.ToJson());
                 playload.Length.ToBytes().CopyTo(buffer.AsSpan(0, 4));
@@ -41,7 +43,7 @@ namespace linker.messenger.store.file
 
                 await socket.SendAsync(buffer.AsMemory(0, playload.Length + 4));
 
-                int length = await socket.ReceiveAsync(buffer.AsMemory(), SocketFlags.None).AsTask().WaitAsync(TimeSpan.FromMilliseconds(5000)).ConfigureAwait(false);
+                int length = await socket.ReceiveAsync(buffer.AsMemory(), SocketFlags.None, cts.Token).ConfigureAwait(false);
 
                 return serializer.Deserialize<string>(buffer.AsSpan(0, length));
             }
@@ -64,15 +66,16 @@ namespace linker.messenger.store.file
         {
             byte[] buffer = ArrayPool<byte>.Shared.Rent(8 * 1024);
             Socket socket = new Socket(server.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            using CancellationTokenSource cts = new CancellationTokenSource(5000);
             try
             {
-                await socket.ConnectAsync(server).WaitAsync(TimeSpan.FromMilliseconds(5000));
+                await socket.ConnectAsync(server, cts.Token);
 
                 buffer[0] = Type;
-                await socket.SendAsync(buffer.AsMemory(0,1));
+                await socket.SendAsync(buffer.AsMemory(0, 1));
                 await socket.SendAsync(serializer.Serialize(new ExportSaveInfo { Type = ExportSaveType.Get, Value = value }.ToJson()));
 
-                int length = await socket.ReceiveAsync(buffer.AsMemory(), SocketFlags.None).AsTask().WaitAsync(TimeSpan.FromMilliseconds(5000)).ConfigureAwait(false);
+                int length = await socket.ReceiveAsync(buffer.AsMemory(), SocketFlags.None, cts.Token).ConfigureAwait(false);
 
                 return serializer.Deserialize<string>(buffer.AsSpan(0, length));
             }
@@ -88,8 +91,10 @@ namespace linker.messenger.store.file
             return string.Empty;
         }
 
+
         public async Task Resolve(Socket socket, Memory<byte> memory)
         {
+            using CancellationTokenSource cts = new CancellationTokenSource(3000);
             byte[] buffer = ArrayPool<byte>.Shared.Rent(8 * 1024);
             try
             {
@@ -97,7 +102,7 @@ namespace linker.messenger.store.file
 
                 while (length < payloadLength + 4)
                 {
-                    length += await socket.ReceiveAsync(buffer.AsMemory(length), SocketFlags.None).ConfigureAwait(false);
+                    length += await socket.ReceiveAsync(buffer.AsMemory(length), SocketFlags.None, cts.Token).ConfigureAwait(false);
                     if (length >= 4) payloadLength = buffer.ToInt32();
                 }
 

@@ -22,8 +22,9 @@ namespace linker.messenger.store.file.sforward
                 Config.Name = Config.Distributed.Node.Name;
                 Config.Url = Config.Distributed.Node.Url;
 
-
-                Config.Host = NetworkHelper.GetEndPoint(Config.Distributed.Node.Host, ServicePort).Address.ToString();
+                var ep = NetworkHelper.GetEndPoint(Config.Distributed.Node.Host, ServicePort);
+                if (ep != null)
+                    Config.Host = ep.Address.ToString();
 
                 Config.Distributed.Node.Id = string.Empty;
                 Confirm();

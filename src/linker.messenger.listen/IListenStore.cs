@@ -1,23 +1,32 @@
-﻿namespace linker.messenger.listen
+﻿using System.Text.Json.Serialization;
+
+namespace linker.messenger.listen
 {
     public interface IListenStore
     {
-        /// <summary>
-        /// 端口
-        /// </summary>
         public int Port { get; }
         public int ApiPort { get; }
-        /// <summary>
-        /// 设置端口
-        /// </summary>
-        /// <param name="port"></param>
-        /// <returns></returns>
+
+        public GeoRegistryInfo GeoRegistry { get; }
+
         public bool SetPort(int port);
         public bool SetApiPort(int port);
-        /// <summary>
-        /// 提交
-        /// </summary>
-        /// <returns></returns>
         public bool Confirm();
+    }
+
+    public sealed class GeoRegistryInfo
+    {
+        public string Url { get; set; } = "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest";
+        public string[] WhiteCountry { get; set; } = [];
+        public string[] BlackCountry { get; set; } = [];
+
+        [JsonIgnore]
+        public byte[] Messengers { get; set; } = [
+            (byte)ResolverType.External,
+            (byte)ResolverType.Messenger,
+            (byte)ResolverType.Relay,
+            (byte)ResolverType.Socks4,
+            (byte)ResolverType.Socks5,
+        ];
     }
 }

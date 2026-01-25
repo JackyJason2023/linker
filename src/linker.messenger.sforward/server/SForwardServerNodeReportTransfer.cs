@@ -1,4 +1,5 @@
 ﻿using linker.libs;
+using linker.libs.extends;
 using linker.messenger.node;
 using linker.messenger.sforward.messenger;
 
@@ -27,7 +28,7 @@ namespace linker.messenger.sforward.server
         public SForwardServerNodeReportTransfer(ISForwardServerWhiteListStore sforwardServerWhiteListStore, SForwardServerConnectionTransfer nodeConnectionTransfer,
             ISForwardNodeConfigStore nodeConfigStore,
             ISerializer serializer, IMessengerSender messengerSender, ISForwardNodeStore nodeStore,
-            IMessengerResolver messengerResolver, ICommonStore commonStore,ISForwardServerMasterDenyStore sforwardServerMasterDenyStore)
+            IMessengerResolver messengerResolver, ICommonStore commonStore, ISForwardServerMasterDenyStore sforwardServerMasterDenyStore)
             : base(nodeConnectionTransfer, nodeConfigStore, serializer, messengerSender, nodeStore, messengerResolver, commonStore, sforwardServerMasterDenyStore)
         {
             this.sforwardServerWhiteListStore = sforwardServerWhiteListStore;
@@ -36,7 +37,7 @@ namespace linker.messenger.sforward.server
             this.nodeStore = nodeStore;
         }
 
-        public override async Task<bool> Update(IConnection conn,SForwardServerNodeStoreInfo info)
+        public override async Task<bool> Update(IConnection conn, SForwardServerNodeStoreInfo info)
         {
             if (nodeConnectionTransfer.TryGet(ConnectionSideType.Master, conn.Id, out var connection) == false || connection.Manageable == false) return false;
 
@@ -76,7 +77,7 @@ namespace linker.messenger.sforward.server
                 .Where(c => super || Environment.TickCount64 - c.LastTicks < 15000)
                 .Where(c =>
                 {
-                    return super || c.Public || sforward.Contains(c.NodeId) || sforward.Contains("*");
+                    return super || (c.Public && (sforward.Contains(c.NodeId) || sforward.Contains("*")));
                 })
                 .OrderByDescending(c => c.LastTicks);
 

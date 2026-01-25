@@ -37,9 +37,12 @@ namespace linker.messenger.relay.server
             this.nodeStore = nodeStore;
         }
 
-        public override async Task<bool> Update(IConnection conn,RelayServerNodeStoreInfo info)
+        public override async Task<bool> Update(IConnection conn, RelayServerNodeStoreInfo info)
         {
-            if (nodeConnectionTransfer.TryGet(ConnectionSideType.Master, conn.Id, out var connection) == false || connection.Manageable == false) return false;
+            if (nodeConnectionTransfer.TryGet(ConnectionSideType.Master, conn.Id, out var connection) == false || connection.Manageable == false)
+            {
+                return false;
+            }
 
             Config.Connections = info.Connections;
             Config.Bandwidth = info.Bandwidth;
@@ -68,20 +71,20 @@ namespace linker.messenger.relay.server
                 .Where(c => super || Environment.TickCount64 - c.LastTicks < 15000)
                 .Where(c =>
                 {
-                    return super || nodes.Contains(c.NodeId) || nodes.Contains("*")
+                    return super || (c.Public && (nodes.Contains(c.NodeId) || nodes.Contains("*")))
                     || (c.Public && c.ConnectionsRatio < c.Connections && (c.DataEachMonth == 0 || (c.DataEachMonth > 0 && c.DataRemain > 0)));
                 })
                 .OrderByDescending(c => c.LastTicks);
 
             var list = result.OrderByDescending(x => x.Connections == 0 ? int.MaxValue : x.Connections)
-                     
+
                      .ThenBy(x => x.ConnectionsRatio)
                      .ThenBy(x => x.BandwidthRatio)
                      .ThenByDescending(x => x.BandwidthEach == 0 ? int.MaxValue : x.BandwidthEach)
                      .ThenByDescending(x => x.Bandwidth == 0 ? int.MaxValue : x.Bandwidth)
                      .ThenByDescending(x => x.DataEachMonth == 0 ? int.MaxValue : x.DataEachMonth)
                      .ThenByDescending(x => x.DataRemain == 0 ? long.MaxValue : x.DataRemain)
-                     
+
                      .ToList();
 
             list.ForEach(c =>
@@ -117,6 +120,5 @@ namespace linker.messenger.relay.server
             });
             return list;
         }
-
     }
 }

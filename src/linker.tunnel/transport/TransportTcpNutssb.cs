@@ -159,6 +159,7 @@ namespace linker.tunnel.transport
 
             foreach (IPEndPoint ep in tunnelTransportInfo.RemoteEndPoints)
             {
+                using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(ep.Address.Equals(tunnelTransportInfo.Remote.Remote.Address) ? 500 : 100));
                 Socket targetSocket = new(ep.AddressFamily, SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
                 try
                 {
@@ -171,7 +172,7 @@ namespace linker.tunnel.transport
                     {
                         LoggerHelper.Instance.Warning($"{Name} connect to {tunnelTransportInfo.Remote.MachineId}->{tunnelTransportInfo.Remote.MachineName} {ep}");
                     }
-                    await targetSocket.ConnectAsync(ep).WaitAsync(TimeSpan.FromMilliseconds(ep.Address.Equals(tunnelTransportInfo.Remote.Remote.Address) ? 500 : 100)).ConfigureAwait(false);
+                    await targetSocket.ConnectAsync(ep,cts.Token).ConfigureAwait(false);
 
                     //需要ssl
                     SslStream sslStream = null;
@@ -250,7 +251,7 @@ namespace linker.tunnel.transport
 
             try
             {
-                ITunnelConnection connection = await tcs.Task.WaitAsync(TimeSpan.FromMilliseconds(5000)).ConfigureAwait(false);
+                ITunnelConnection connection = await tcs.WithTimeout(TimeSpan.FromMilliseconds(5000)).ConfigureAwait(false);
                 return connection;
             }
             catch (Exception)
@@ -332,21 +333,16 @@ namespace linker.tunnel.transport
             socket.ReuseBind(new IPEndPoint(localIP, local.Port));
             socket.Listen(int.MaxValue);
 
+            using CancellationTokenSource cts = new CancellationTokenSource(5000);
             try
             {
-                Socket client = await socket.AcceptAsync().WaitAsync(TimeSpan.FromMilliseconds(30000)).ConfigureAwait(false);
+                Socket client = await socket.AcceptAsync(cts.Token).ConfigureAwait(false);
                 await OnTcpConnected(tunnelTransportInfo, client).ConfigureAwait(false);
             }
             catch (Exception)
             {
             }
-            try
-            {
-                socket.SafeClose();
-            }
-            catch (Exception)
-            {
-            }
+            socket.SafeClose();
         }
     }
 }

@@ -148,7 +148,7 @@ namespace linker.messenger.forward
         {
             forwardInfo.GroupId = signInClientStore.Group.Id;
             forwardClientStore.Add(forwardInfo);
-            counterDecenter.SetValue("forward",Count);
+            counterDecenter.SetValue("forward", Count);
             Start();
 
             return true;
@@ -177,10 +177,11 @@ namespace linker.messenger.forward
 
             async Task Connect(ForwardTestInfo info)
             {
-                Socket socket = new Socket(info.Target.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                using CancellationTokenSource cts = new CancellationTokenSource(100);
+                using Socket socket = new Socket(info.Target.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                 try
                 {
-                    await socket.ConnectAsync(info.Target).WaitAsync(TimeSpan.FromMilliseconds(100)).ConfigureAwait(false);
+                    await socket.ConnectAsync(info.Target, cts.Token).ConfigureAwait(false);
                     info.Msg = string.Empty;
                 }
                 catch (Exception ex)
@@ -189,6 +190,7 @@ namespace linker.messenger.forward
                 }
                 finally
                 {
+                    cts.Cancel();
                     socket.SafeClose();
                 }
             }

@@ -2,10 +2,12 @@
 
 namespace linker.messenger.store.file.server
 {
-    public sealed class ListenStore: IListenStore
+    public sealed class ListenStore : IListenStore
     {
         public int Port => config.Data.Server.ServicePort;
         public int ApiPort => config.Data.Server.ApiPort;
+
+        public GeoRegistryInfo GeoRegistry => config.Data.Server.GeoRegistry;
 
         private readonly FileConfig config;
         public ListenStore(FileConfig config)

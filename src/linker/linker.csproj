@@ -11,8 +11,6 @@
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<Configurations>Debug;Release</Configurations>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-		<PublishAot>false</PublishAot>
-		<PublishTrimmed>true</PublishTrimmed>
 		<JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
 		<SignAssembly>true</SignAssembly>
 		<ServerGarbageCollection>false</ServerGarbageCollection>
@@ -20,21 +18,38 @@
 		<Authors>snltty</Authors>
 		<Company>snltty</Company>
 		<Description>1. 一些累计更新，一些BUG修复
-2. 重构中继和穿透的多节点模式
-3. 中继连接合并到隧道协议中
-4. 修复socks代理错误
-5. 发布飞牛fpk安装包(docker+bin)
-6. 优化虚拟网卡自动连接表现
-7. 简化加入分组操作
-8. 先不要更新，作者测试中，请使用v1.9.6</Description>
+2. 国家级别的连接限制
+3. 修复一些地方未能正确释放端口的问题
+4. 一些UI错位修复
+5. net10发布后在一些系统无法正常运行，先回退net8
+6. 修复协议设置bug，增加隧道协议选项，增加wol的ip项</Description>
 		<Copyright>snltty</Copyright>
 		<PackageProjectUrl>https://github.com/snltty/linker</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/snltty/linker</RepositoryUrl>
 		<PackageReleaseNotes>linker</PackageReleaseNotes>
-		<Version>1.9.7</Version>
-		<AssemblyVersion>1.9.7</AssemblyVersion>
-		<FileVersion>1.9.7</FileVersion>
+		<Version>1.9.9</Version>
+		<AssemblyVersion>1.9.9</AssemblyVersion>
+		<FileVersion>1.9.9</FileVersion>
 		<DelaySign>False</DelaySign>
+
+
+		<PublishAot>false</PublishAot>
+		<PublishTrimmed>true</PublishTrimmed>
+		<PublishSingleFile>true</PublishSingleFile>
+		<TieredPGO>true</TieredPGO>
+		<TrimMode>partial</TrimMode>
+		<EventSourceSupport>false</EventSourceSupport>
+		<EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+		<DebuggerSupport>false</DebuggerSupport>
+		<EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+		<EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+		<HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+		<InvariantGlobalization>false</InvariantGlobalization>
+		<MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+		<UseSystemResourceKeys>true</UseSystemResourceKeys>
+		<MetricsSupport>false</MetricsSupport>
+		<StackTraceSupport>false</StackTraceSupport>
+		<XmlResolverIsNetworkingEnabledByDefault>false</XmlResolverIsNetworkingEnabledByDefault>
 	</PropertyGroup>
 
 

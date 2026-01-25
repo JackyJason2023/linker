@@ -56,10 +56,11 @@ namespace linker.tunnel.wanport
                     UdpClient udpClient = new UdpClient(server.AddressFamily);
                     udpClient.Client.ReuseBind(new IPEndPoint(IPAddress.Any, 0));
                     udpClient.Client.WindowsUdpBug();
+                    using CancellationTokenSource cts = new CancellationTokenSource(500);
                     try
                     {
                         await udpClient.SendAsync(BuildSendData(buffer, i), server).ConfigureAwait(false);
-                        UdpReceiveResult result = await udpClient.ReceiveAsync().WaitAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+                        UdpReceiveResult result = await udpClient.ReceiveAsync(cts.Token).ConfigureAwait(false);
                         if (result.Buffer.Length > 0)
                         {
                             return new TunnelWanPortEndPoint
@@ -111,15 +112,16 @@ namespace linker.tunnel.wanport
         public async Task<TunnelWanPortEndPoint> GetAsync(IPEndPoint server)
         {
             byte[] buffer = ArrayPool<byte>.Shared.Rent(1024);
+            using CancellationTokenSource cts = new CancellationTokenSource(5000);
             try
             {
                 Socket socket = new Socket(server.AddressFamily, SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
                 socket.ReuseBind(new IPEndPoint(IPAddress.Any, 0));
-                await socket.ConnectAsync(server).ConfigureAwait(false);
+                await socket.ConnectAsync(server, cts.Token).ConfigureAwait(false);
 
                 await socket.SendAsync(BuildSendData(buffer, (byte)new Random().Next(0, 255))).ConfigureAwait(false);
 
-                int length = await socket.ReceiveAsync(buffer.AsMemory(), SocketFlags.None).AsTask().WaitAsync(TimeSpan.FromSeconds(5000)).ConfigureAwait(false);
+                int length = await socket.ReceiveAsync(buffer.AsMemory(), SocketFlags.None, cts.Token).ConfigureAwait(false);
                 IPEndPoint localEP = socket.LocalEndPoint as IPEndPoint;
                 socket.Close();
 

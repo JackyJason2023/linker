@@ -150,15 +150,17 @@ namespace linker.messenger.signin
             if (TryGet(machineId, out SignCacheInfo cache))
             {
                 cache.LastSignIn = DateTime.Now;
+                cache.LastTicks = Environment.TickCount64;
             }
-            return signInStore.Exp(machineId);
+
+            return signInStore.Hosts;
         }
 
         private void ClearTask()
         {
             TimerHelper.SetIntervalLong(() =>
             {
-                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                //if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                 {
                     LoggerHelper.Instance.Debug($"start cleaning up clients that have exceeded the {signInStore.CleanDays}-day timeout period");
                 }
@@ -166,15 +168,32 @@ namespace linker.messenger.signin
                 try
                 {
                     DateTime now = DateTime.Now;
+                    long ticks = Environment.TickCount64;
 
-                    var groups = Clients.Values.GroupBy(c => c.GroupId)
+                    var allClients = Clients.Values;
+                    var updates = allClients.Where(c => ticks - c.LastTicks < 60000).Select(c => c.MachineId).ToList();
+                    if (updates.Count > 0)
+                    {
+                        int p = 1, ps = 20;
+                        while (true)
+                        {
+                            var items = updates.Skip((p - 1) * ps).Take(ps).ToList();
+                            if (items.Count == 0)
+                            {
+                                break;
+                            }
+                            signInStore.Exp(items);
+                            p++;
+                        }
+                    }
+
+                    var groups = allClients.GroupBy(c => c.GroupId)
                      .Where(group => group.All(info => info.Connected == false && (now - info.LastSignIn).TotalDays > signInStore.CleanDays))
                      .Select(group => group.Key).ToList();
 
                     if (groups.Count > 0)
                     {
-                        var items = Clients.Values.Where(c => groups.Contains(c.GroupId)).ToList();
-
+                        var items = allClients.Where(c => groups.Contains(c.GroupId)).ToList();
                         foreach (var item in items)
                         {
                             Clients.TryRemove(item.MachineId, out _);
@@ -270,6 +289,9 @@ namespace linker.messenger.signin
         public IConnection Connection { get; set; }
         [JsonIgnore]
         public uint Order { get; set; } = int.MaxValue;
+
+        [JsonIgnore]
+        public long LastTicks { get; set; }
 
         public bool SameGroup(SignCacheInfo other)
         {

@@ -42,7 +42,7 @@ namespace linker.messenger.store.file
                     }
                     
                     database = new LiteDatabase(new ConnectionString($"Filename={db};Password={Helper.GlobalString}"), bsonMapper);
-                    database.CheckpointSize = 100;
+                    database.CheckpointSize = 1000;
                 }
             }
             catch (Exception ex)
@@ -55,6 +55,10 @@ namespace linker.messenger.store.file
         public ILiteCollection<T> GetCollection<T>(string name)
         {
             return database.GetCollection<T>(name);
+        }
+        public IBsonDataReader Execute(string command, BsonDocument parameters = null)
+        {
+            return database.Execute(command, parameters);
         }
 
         public void Dispose()

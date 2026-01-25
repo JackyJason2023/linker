@@ -1,6 +1,7 @@
 ﻿using linker.libs;
 using linker.messenger.tunnel;
 using linker.tunnel.transport;
+using System.Net;
 
 namespace linker.messenger.store.file.tunnel
 {
@@ -10,11 +11,12 @@ namespace linker.messenger.store.file.tunnel
 
         public int PortMapPrivate => runningConfig.Data.Tunnel.PortMapLan;
         public int PortMapPublic => runningConfig.Data.Tunnel.PortMapWan;
+        public IPAddress InIp => runningConfig.Data.Tunnel.InIp;
         public TunnelPublicNetworkInfo Network => runningConfig.Data.Tunnel.Network;
 
         public Action OnChanged { get; set; } = () => { };
 
-        public int TransportMachineIdCount => runningConfig.Data.Tunnel.Transports.Count;
+        public int TransportMachineIdCount => runningConfig.Data.Tunnel.Transports.Where(c => c.Value != null && c.Value.Count > 0).Count();
 
         private readonly RunningConfig runningConfig;
 
@@ -27,7 +29,6 @@ namespace linker.messenger.store.file.tunnel
             if (string.IsNullOrWhiteSpace(machineId)) return false;
 
             runningConfig.Data.Tunnel.Transports[machineId] = list;
-            //   .AddOrUpdate(machineId, list, (a, b) => list);
             runningConfig.Data.Update();
 
             OnChanged();
@@ -47,7 +48,6 @@ namespace linker.messenger.store.file.tunnel
             ForceUpdate(transportItems, list);
 
             runningConfig.Data.Tunnel.Transports[machineId] = transportItems;
-            //.AddOrUpdate(machineId, transportItems, (a, b) => transportItems);
             runningConfig.Data.Update();
 
             OnChanged();
@@ -57,14 +57,13 @@ namespace linker.messenger.store.file.tunnel
 
         public async Task<List<TunnelTransportItemInfo>> GetTunnelTransports(string machineId)
         {
-            if (runningConfig.Data.Tunnel.Transports.TryGetValue(machineId, out List<TunnelTransportItemInfo> list))
+            if (runningConfig.Data.Tunnel.Transports.TryGetValue(machineId, out List<TunnelTransportItemInfo> list) && list != null && list.Count > 0)
             {
                 if (runningConfig.Data.Tunnel.Transports.TryGetValue(Helper.GlobalString, out List<TunnelTransportItemInfo> defaults))
                 {
                     if (Rebuild(list, defaults))
                     {
                         runningConfig.Data.Tunnel.Transports[machineId] = list;
-                        //.AddOrUpdate(machineId, list, (a, b) => list);
                         runningConfig.Data.Update();
                     }
                 }
@@ -134,7 +133,8 @@ namespace linker.messenger.store.file.tunnel
                     DisableReverse = c.DisableReverse,
                     SSL = c.SSL,
                     DisableSSL = c.DisableSSL,
-                    Order = c.Order
+                    Order = c.Order,
+                    Addr = c.Addr
                 }));
             }
             //有已移除的协议
@@ -148,8 +148,6 @@ namespace linker.messenger.store.file.tunnel
             }
             return newTransportNames.Any() || oldTransportNames.Any();
         }
-
-
 
         public async Task<bool> SetRouteLevelPlus(int level)
         {
@@ -171,6 +169,14 @@ namespace linker.messenger.store.file.tunnel
             runningConfig.Data.Update();
             OnChanged();
             return false;
+        }
+
+        public async Task<bool> SetInIp(IPAddress ip)
+        {
+            runningConfig.Data.Tunnel.InIp = ip;
+            runningConfig.Data.Update();
+            OnChanged();
+            return await Task.FromResult(true).ConfigureAwait(false);
         }
     }
 }
