@@ -135,7 +135,6 @@ namespace linker.tun
                 }
                 linkerTunDevice.SetMtu(info.Mtu);
                 Read();
-
                 lanSrcProxy.Setup(address, prefixLength, this, ref natError);
                 return true;
             }
@@ -366,6 +365,7 @@ namespace linker.tun
                 return false;
             }
             LinkerTunPacketHookFlags flags = LinkerTunPacketHookFlags.Next | LinkerTunPacketHookFlags.Write;
+
             for (int i = 0; i < writeHooks.Length; i++)
             {
                 (LinkerTunPacketHookFlags addFlags, LinkerTunPacketHookFlags delFlags) = await writeHooks[i].WriteAsync(buffer, dstIp, srcId).ConfigureAwait(false);
