@@ -93,7 +93,7 @@ namespace linker.messenger.tunnel
         public bool Connect(ApiControllerParamsInfo param)
         {
             TunnelConnectInfo tunnelConnectInfo = param.Content.DeJson<TunnelConnectInfo>();
-            _ = tunnelTransfer.ConnectAsync(tunnelConnectInfo.ToMachineId, tunnelConnectInfo.TransactionId, tunnelConnectInfo.DenyProtocols, exTransportNames: ["TcpRelay"]);
+            _ = tunnelTransfer.ConnectAsync(tunnelConnectInfo.ToMachineId, tunnelConnectInfo.TransactionId, tunnelConnectInfo.DenyProtocols, flag: "hand", exTunnelTypes: [TunnelType.Relay]);
 
             return true;
         }

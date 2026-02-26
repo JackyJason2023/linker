@@ -172,9 +172,12 @@ namespace linker.messenger.serializer.memorypack
         [MemoryPackInclude]
         Addrs Addr => tunnelTransportItemInfo.Addr;
 
+        [MemoryPackInclude]
+        TunnelType TunnelType => tunnelTransportItemInfo.TunnelType;
+
 
         [MemoryPackConstructor]
-        SerializableTunnelTransportItemInfo(string name, string label, string protocolType, bool disabled, bool reverse, bool ssl, byte buffersize, byte order, Addrs addr)
+        SerializableTunnelTransportItemInfo(string name, string label, string protocolType, bool disabled, bool reverse, bool ssl, byte buffersize, byte order, Addrs addr, TunnelType tunnelType)
         {
             var tunnelTransportItemInfo = new TunnelTransportItemInfo
             {
@@ -186,7 +189,8 @@ namespace linker.messenger.serializer.memorypack
                 SSL = ssl,
                 BufferSize = buffersize,
                 Order = order,
-                 Addr = addr
+                Addr = addr,
+                TunnelType = tunnelType
             };
             this.tunnelTransportItemInfo = tunnelTransportItemInfo;
         }
@@ -229,6 +233,9 @@ namespace linker.messenger.serializer.memorypack
             value.Order = reader.ReadValue<byte>();
             if (count > 8)
                 value.Addr = reader.ReadValue<Addrs>();
+
+            if (count > 9)
+                value.TunnelType = reader.ReadValue<TunnelType>();
         }
     }
 
@@ -270,9 +277,12 @@ namespace linker.messenger.serializer.memorypack
         [MemoryPackInclude]
         string TransactionTag => tunnelTransportInfo.TransactionTag;
 
+        [MemoryPackInclude]
+        string Flag => tunnelTransportInfo.Flag;
+
         [MemoryPackConstructor]
         SerializableTunnelTransportInfo(TunnelTransportWanPortInfo local, TunnelTransportWanPortInfo remote, string transactionId,
-            TunnelProtocolType transportType, string transportName, TunnelDirection direction, bool ssl, byte bufferSize, uint flowid, string transactionTag)
+            TunnelProtocolType transportType, string transportName, TunnelDirection direction, bool ssl, byte bufferSize, uint flowid, string transactionTag, string flag)
         {
             var tunnelTransportInfo = new TunnelTransportInfo
             {
@@ -285,7 +295,8 @@ namespace linker.messenger.serializer.memorypack
                 SSL = ssl,
                 BufferSize = bufferSize,
                 FlowId = flowid,
-                TransactionTag = transactionTag
+                TransactionTag = transactionTag,
+                Flag = flag
             };
             this.tunnelTransportInfo = tunnelTransportInfo;
         }
@@ -330,6 +341,8 @@ namespace linker.messenger.serializer.memorypack
             value.FlowId = reader.ReadValue<uint>();
             if (count > 9)
                 value.TransactionTag = reader.ReadValue<string>();
+            if (count > 10)
+                value.Flag = reader.ReadValue<string>();
         }
     }
 

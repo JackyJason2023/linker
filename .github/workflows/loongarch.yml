@@ -1,0 +1,30 @@
+name: LoongArch
+'on':
+  workflow_dispatch: null
+jobs:
+  build-loongarch64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build with manual .NET installation
+        run: |
+          sudo apt-get update || true && \
+          sudo apt-get install -y gnupg curl wget ca-certificates && \
+          docker run --rm --platform linux/loong64 \
+            -v ${{ github.workspace }}:/src \
+            -w /src \
+             loongarch64/debian:latest \
+            /bin/bash -c "
+              sudo apt-get update && \\
+              sudo apt-get install dotnet-sdk-8.0 && \
+              dotnet publish src/linker -c Release \
+                -r linux-loongarch64 \
+                --self-contained true \
+                -p:PublishSingleFile=true \
+                -p:IncludeNativeLibrariesForSelfExtract=true \
+                -o /src/publish
+            "
