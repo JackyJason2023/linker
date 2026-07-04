@@ -1,6 +1,5 @@
 ﻿using linker.libs;
-using linker.libs.extends;
-using linker.messenger.exroute;
+using linker.messenger.rpolicy;
 using linker.messenger.signin;
 using linker.nat;
 using System.Net;
@@ -16,14 +15,15 @@ namespace linker.messenger.socks5
         private readonly Socks5Decenter socks5Decenter;
         private readonly SignInClientState signInClientState;
         private readonly ISignInClientStore signInClientStore;
-        private readonly ExRouteTransfer exRouteTransfer;
+        private readonly RouteExclusionPolicyTransfer routeExclusionPolicyTransfer;
         private readonly ISocks5Store socks5Store;
-        public Socks5CidrDecenterManager(Socks5Decenter socks5Decenter, SignInClientState signInClientState, ISignInClientStore signInClientStore, ExRouteTransfer exRouteTransfer, ISocks5Store socks5Store)
+        public Socks5CidrDecenterManager(Socks5Decenter socks5Decenter, SignInClientState signInClientState, ISignInClientStore signInClientStore,
+            RouteExclusionPolicyTransfer routeExclusionPolicyTransfer, ISocks5Store socks5Store)
         {
             this.socks5Decenter = socks5Decenter;
             this.signInClientState = signInClientState;
             this.signInClientStore = signInClientStore;
-            this.exRouteTransfer = exRouteTransfer;
+            this.routeExclusionPolicyTransfer = routeExclusionPolicyTransfer;
             this.socks5Store = socks5Store;
 
             socks5Decenter.OnChanged += AddRoute;
@@ -37,7 +37,13 @@ namespace linker.messenger.socks5
         }
         public bool FindValue(uint ip, out string value)
         {
-            return cidrManager.FindValue(ip, out value);
+            value = string.Empty;
+            bool result = cidrManager.FindValue(ip, out CidrAddInfo<string> _value);
+
+            if (result)
+                value = _value.Value;
+
+            return result;
         }
 
         private void SetMaps()
@@ -59,7 +65,7 @@ namespace linker.messenger.socks5
         private List<Socks5LanIPAddressList> ParseIPs(List<Socks5Info> infos)
         {
             //排除的IP，
-            uint[] excludeIps = exRouteTransfer.Get().Concat(socks5Store.Lans.Select(c => c.IP))
+            uint[] excludeIps = routeExclusionPolicyTransfer.Query().Concat(socks5Store.Lans.Select(c => c.IP))
                 .Select(NetworkHelper.ToValue)
                 .ToArray();
 

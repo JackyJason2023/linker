@@ -1,43 +1,9 @@
-﻿using linker.messenger.signin;
+using linker.messenger.signin;
 using MemoryPack;
 using System.Net;
 
 namespace linker.messenger.serializer.memorypack
 {
-    [MemoryPackable]
-    public readonly partial struct SerializableSignInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignInfo info;
-
-        [MemoryPackInclude]
-        string MachineId => info.MachineId;
-
-        [MemoryPackInclude]
-        string MachineName => info.MachineName;
-
-        [MemoryPackInclude]
-        string GroupId => info.GroupId;
-
-        [MemoryPackInclude]
-        string Version => info.Version;
-
-        [MemoryPackInclude]
-        Dictionary<string, string> Args => info.Args;
-
-
-        [MemoryPackConstructor]
-        SerializableSignInfo(string machineId, string machineName, string groupId, string version, Dictionary<string, string> args)
-        {
-            var info = new SignInfo { MachineId = machineId, MachineName = machineName, Args = args, GroupId = groupId, Version = version };
-            this.info = info;
-        }
-
-        public SerializableSignInfo(SignInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
     public class SignInfoFormatter : MemoryPackFormatter<SignInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignInfo value)
@@ -48,7 +14,12 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignInfo(value));
+            writer.WriteObjectHeader(5);
+            writer.WriteValue(value.MachineId);
+            writer.WriteValue(value.MachineName);
+            writer.WriteValue(value.GroupId);
+            writer.WriteValue(value.Version);
+            writer.WriteValue(value.Args);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignInfo value)
@@ -60,65 +31,16 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignInfo>();
-            value = wrapped.info;
+            value = new SignInfo();
+            reader.TryReadObjectHeader(out byte count);
+            value.MachineId = reader.ReadValue<string>();
+            value.MachineName = reader.ReadValue<string>();
+            value.GroupId = reader.ReadValue<string>();
+            value.Version = reader.ReadValue<string>();
+            value.Args = reader.ReadValue<Dictionary<string, string>>();
         }
     }
 
-
-    [MemoryPackable]
-    public readonly partial struct SerializableSignCacheInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignCacheInfo info;
-
-        [MemoryPackInclude]
-        string MachineId => info.MachineId;
-        [MemoryPackInclude]
-        string MachineName => info.MachineName;
-
-        [MemoryPackInclude]
-        string Version => info.Version;
-        [MemoryPackInclude]
-        string GroupId => info.GroupId;
-
-        [MemoryPackInclude]
-        DateTime LastSignIn => info.LastSignIn;
-
-        [MemoryPackInclude]
-        Dictionary<string, string> Args => info.Args;
-
-        [MemoryPackInclude, MemoryPackAllowSerialize]
-        IPEndPoint IP => info.IP;
-
-        [MemoryPackInclude, MemoryPackAllowSerialize]
-        bool Connected => info.Connected;
-
-
-        [MemoryPackConstructor]
-        SerializableSignCacheInfo(string machineId, string machineName, string version, string groupId, DateTime lastSignIn, Dictionary<string, string> args, IPEndPoint ip, bool connected)
-        {
-            var info = new SignCacheInfo
-            {
-                Id = string.Empty,
-                MachineId = machineId,
-                MachineName = machineName,
-                GroupId = groupId,
-                Version = version,
-                Args = args,
-                LastSignIn = lastSignIn,
-                IP = ip,
-                Connected = connected,
-                Order = 0
-            };
-            this.info = info;
-        }
-
-        public SerializableSignCacheInfo(SignCacheInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
     public class SignCacheInfoFormatter : MemoryPackFormatter<SignCacheInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignCacheInfo value)
@@ -129,7 +51,15 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignCacheInfo(value));
+            writer.WriteObjectHeader(8);
+            writer.WriteValue(value.MachineId);
+            writer.WriteValue(value.MachineName);
+            writer.WriteValue(value.Version);
+            writer.WriteValue(value.GroupId);
+            writer.WriteValue(value.LastSignIn);
+            writer.WriteValue(value.Args);
+            writer.WriteValue(value.IP);
+            writer.WriteValue(value.Connected);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignCacheInfo value)
@@ -141,51 +71,21 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignCacheInfo>();
-            value = wrapped.info;
+            value = new SignCacheInfo();
+            value.Id = string.Empty;
+            value.Order = 0;
+            reader.TryReadObjectHeader(out byte count);
+            value.MachineId = reader.ReadValue<string>();
+            value.MachineName = reader.ReadValue<string>();
+            value.Version = reader.ReadValue<string>();
+            value.GroupId = reader.ReadValue<string>();
+            value.LastSignIn = reader.ReadValue<DateTime>();
+            value.Args = reader.ReadValue<Dictionary<string, string>>();
+            value.IP = reader.ReadValue<IPEndPoint>();
+            value.Connected = reader.ReadValue<bool>();
         }
     }
 
-
-    [MemoryPackable]
-    public readonly partial struct SerializableSignInListRequestInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignInListRequestInfo info;
-
-        [MemoryPackInclude]
-        int Page => info.Page;
-        [MemoryPackInclude]
-        int Size => info.Size;
-        [MemoryPackInclude]
-        string Name => info.Name;
-        [MemoryPackInclude]
-        string[] Ids => info.Ids;
-        [MemoryPackInclude]
-        bool Asc => info.Asc;
-        [MemoryPackInclude]
-        string Prop => info.Prop;
-
-        [MemoryPackConstructor]
-        SerializableSignInListRequestInfo(int page, int size, string name, string[] ids, bool asc, string prop)
-        {
-            var info = new SignInListRequestInfo
-            {
-                Page = page,
-                Size = size,
-                Name = name,
-                Ids = ids,
-                Asc = asc,
-                Prop = prop
-            };
-            this.info = info;
-        }
-
-        public SerializableSignInListRequestInfo(SignInListRequestInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
     public class SignInListRequestInfoFormatter : MemoryPackFormatter<SignInListRequestInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignInListRequestInfo value)
@@ -196,7 +96,13 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignInListRequestInfo(value));
+            writer.WriteObjectHeader(6);
+            writer.WriteValue(value.Page);
+            writer.WriteValue(value.Size);
+            writer.WriteValue(value.Name);
+            writer.WriteValue(value.Ids);
+            writer.WriteValue(value.Asc);
+            writer.WriteValue(value.Prop);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignInListRequestInfo value)
@@ -208,41 +114,17 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignInListRequestInfo>();
-            value = wrapped.info;
+            value = new SignInListRequestInfo();
+            reader.TryReadObjectHeader(out byte count);
+            value.Page = reader.ReadValue<int>();
+            value.Size = reader.ReadValue<int>();
+            value.Name = reader.ReadValue<string>();
+            value.Ids = reader.ReadValue<string[]>();
+            value.Asc = reader.ReadValue<bool>();
+            value.Prop = reader.ReadValue<string>();
         }
     }
 
-    [MemoryPackable]
-    public readonly partial struct SerializableSignInListResponseInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignInListResponseInfo info;
-
-        [MemoryPackInclude, MemoryPackAllowSerialize]
-        SignInListRequestInfo Request => info.Request;
-        [MemoryPackInclude]
-        int Count => info.Count;
-        [MemoryPackInclude]
-        List<SignCacheInfo> List => info.List;
-
-        [MemoryPackConstructor]
-        SerializableSignInListResponseInfo(SignInListRequestInfo request, int count, List<SignCacheInfo> list)
-        {
-            var info = new SignInListResponseInfo
-            {
-                Request = request,
-                Count = count,
-                List = list
-            };
-            this.info = info;
-        }
-
-        public SerializableSignInListResponseInfo(SignInListResponseInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
     public class SignInListResponseInfoFormatter : MemoryPackFormatter<SignInListResponseInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignInListResponseInfo value)
@@ -253,7 +135,10 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignInListResponseInfo(value));
+            writer.WriteObjectHeader(3);
+            writer.WriteValue(value.Request);
+            writer.WriteValue(value.Count);
+            writer.WriteValue(value.List);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignInListResponseInfo value)
@@ -265,43 +150,14 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignInListResponseInfo>();
-            value = wrapped.info;
+            value = new SignInListResponseInfo();
+            reader.TryReadObjectHeader(out byte count);
+            value.Request = reader.ReadValue<SignInListRequestInfo>();
+            value.Count = reader.ReadValue<int>();
+            value.List = reader.ReadValue<List<SignCacheInfo>>();
         }
     }
 
-
-
-    [MemoryPackable]
-    public readonly partial struct SerializableSignInIdsRequestInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignInIdsRequestInfo info;
-
-        [MemoryPackInclude]
-        int Page => info.Page;
-        [MemoryPackInclude]
-        int Size => info.Size;
-        [MemoryPackInclude]
-        string Name => info.Name;
-
-        [MemoryPackConstructor]
-        SerializableSignInIdsRequestInfo(int page, int size, string name)
-        {
-            var info = new SignInIdsRequestInfo
-            {
-                Page = page,
-                Size = size,
-                Name = name
-            };
-            this.info = info;
-        }
-
-        public SerializableSignInIdsRequestInfo(SignInIdsRequestInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
     public class SignInIdsRequestInfoFormatter : MemoryPackFormatter<SignInIdsRequestInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignInIdsRequestInfo value)
@@ -312,7 +168,10 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignInIdsRequestInfo(value));
+            writer.WriteObjectHeader(3);
+            writer.WriteValue(value.Page);
+            writer.WriteValue(value.Size);
+            writer.WriteValue(value.Name);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignInIdsRequestInfo value)
@@ -324,41 +183,14 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignInIdsRequestInfo>();
-            value = wrapped.info;
+            value = new SignInIdsRequestInfo();
+            reader.TryReadObjectHeader(out byte count);
+            value.Page = reader.ReadValue<int>();
+            value.Size = reader.ReadValue<int>();
+            value.Name = reader.ReadValue<string>();
         }
     }
 
-    [MemoryPackable]
-    public readonly partial struct SerializableSignInIdsResponseInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignInIdsResponseInfo info;
-
-        [MemoryPackInclude, MemoryPackAllowSerialize]
-        SignInIdsRequestInfo Request => info.Request;
-        [MemoryPackInclude]
-        int Count => info.Count;
-        [MemoryPackInclude]
-        List<SignInIdsResponseItemInfo> List => info.List;
-
-        [MemoryPackConstructor]
-        SerializableSignInIdsResponseInfo(SignInIdsRequestInfo request, int count, List<SignInIdsResponseItemInfo> list)
-        {
-            var info = new SignInIdsResponseInfo
-            {
-                Request = request,
-                Count = count,
-                List = list
-            };
-            this.info = info;
-        }
-
-        public SerializableSignInIdsResponseInfo(SignInIdsResponseInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
     public class SignInIdsResponseInfoFormatter : MemoryPackFormatter<SignInIdsResponseInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignInIdsResponseInfo value)
@@ -369,7 +201,10 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignInIdsResponseInfo(value));
+            writer.WriteObjectHeader(3);
+            writer.WriteValue(value.Request);
+            writer.WriteValue(value.Count);
+            writer.WriteValue(value.List);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignInIdsResponseInfo value)
@@ -381,38 +216,14 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignInIdsResponseInfo>();
-            value = wrapped.info;
+            value = new SignInIdsResponseInfo();
+            reader.TryReadObjectHeader(out byte count);
+            value.Request = reader.ReadValue<SignInIdsRequestInfo>();
+            value.Count = reader.ReadValue<int>();
+            value.List = reader.ReadValue<List<SignInIdsResponseItemInfo>>();
         }
     }
 
-
-
-    [MemoryPackable]
-    public readonly partial struct SerializableSignInIdsResponseItemInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignInIdsResponseItemInfo info;
-
-        [MemoryPackInclude]
-        string MachineId => info.MachineId;
-
-        [MemoryPackInclude]
-        string MachineName => info.MachineName;
-
-
-        [MemoryPackConstructor]
-        SerializableSignInIdsResponseItemInfo(string machineId, string machineName)
-        {
-            var info = new SignInIdsResponseItemInfo { MachineId = machineId, MachineName = machineName };
-            this.info = info;
-        }
-
-        public SerializableSignInIdsResponseItemInfo(SignInIdsResponseItemInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
     public class SignInIdsResponseItemInfoFormatter : MemoryPackFormatter<SignInIdsResponseItemInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignInIdsResponseItemInfo value)
@@ -423,7 +234,9 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignInIdsResponseItemInfo(value));
+            writer.WriteObjectHeader(2);
+            writer.WriteValue(value.MachineId);
+            writer.WriteValue(value.MachineName);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignInIdsResponseItemInfo value)
@@ -435,38 +248,13 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignInIdsResponseItemInfo>();
-            value = wrapped.info;
+            value = new SignInIdsResponseItemInfo();
+            reader.TryReadObjectHeader(out byte count);
+            value.MachineId = reader.ReadValue<string>();
+            value.MachineName = reader.ReadValue<string>();
         }
     }
 
-    [MemoryPackable]
-    public readonly partial struct SerializableSignInNamesResponseItemInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignInNamesResponseItemInfo info;
-
-        [MemoryPackInclude]
-        string MachineId => info.MachineId;
-
-        [MemoryPackInclude]
-        string MachineName => info.MachineName;
-
-        [MemoryPackInclude]
-        bool Online => info.Online;
-
-        [MemoryPackConstructor]
-        SerializableSignInNamesResponseItemInfo(string machineId, string machineName, bool online)
-        {
-            var info = new SignInNamesResponseItemInfo { MachineId = machineId, MachineName = machineName, Online = online };
-            this.info = info;
-        }
-
-        public SerializableSignInNamesResponseItemInfo(SignInNamesResponseItemInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
     public class SignInNamesResponseItemInfoFormatter : MemoryPackFormatter<SignInNamesResponseItemInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignInNamesResponseItemInfo value)
@@ -477,7 +265,10 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignInNamesResponseItemInfo(value));
+            writer.WriteObjectHeader(3);
+            writer.WriteValue(value.MachineId);
+            writer.WriteValue(value.MachineName);
+            writer.WriteValue(value.Online);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignInNamesResponseItemInfo value)
@@ -489,40 +280,14 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignInNamesResponseItemInfo>();
-            value = wrapped.info;
+            value = new SignInNamesResponseItemInfo();
+            reader.TryReadObjectHeader(out byte count);
+            value.MachineId = reader.ReadValue<string>();
+            value.MachineName = reader.ReadValue<string>();
+            value.Online = reader.ReadValue<bool>();
         }
     }
-    [MemoryPackable]
-    public readonly partial struct SerializableSignInUserIdsResponseItemInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignInUserIdsResponseItemInfo info;
-
-        [MemoryPackInclude]
-        string MachineId => info.MachineId;
-
-        [MemoryPackInclude]
-        string MachineName => info.MachineName;
-
-        [MemoryPackInclude]
-        string UserId => info.UserId;
-
-        [MemoryPackInclude]
-        bool Online => info.Online;
-
-        [MemoryPackConstructor]
-        SerializableSignInUserIdsResponseItemInfo(string machineid, string machineName, string userId, bool online)
-        {
-            var info = new SignInUserIdsResponseItemInfo { MachineId = machineid, UserId = userId, MachineName = machineName, Online = online };
-            this.info = info;
-        }
-
-        public SerializableSignInUserIdsResponseItemInfo(SignInUserIdsResponseItemInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
+   
     public class SignInUserIdsResponseItemInfoFormatter : MemoryPackFormatter<SignInUserIdsResponseItemInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignInUserIdsResponseItemInfo value)
@@ -533,7 +298,11 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignInUserIdsResponseItemInfo(value));
+            writer.WriteObjectHeader(4);
+            writer.WriteValue(value.MachineId);
+            writer.WriteValue(value.MachineName);
+            writer.WriteValue(value.UserId);
+            writer.WriteValue(value.Online);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignInUserIdsResponseItemInfo value)
@@ -545,43 +314,15 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignInUserIdsResponseItemInfo>();
-            value = wrapped.info;
+            value = new SignInUserIdsResponseItemInfo();
+            reader.TryReadObjectHeader(out byte count);
+            value.MachineId = reader.ReadValue<string>();
+            value.MachineName = reader.ReadValue<string>();
+            value.UserId = reader.ReadValue<string>();
+            value.Online = reader.ReadValue<bool>();
         }
     }
 
-
-    [MemoryPackable]
-    public readonly partial struct SerializableSignInResponseInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignInResponseInfo info;
-
-        [MemoryPackInclude]
-        bool Status => info.Status;
-
-        [MemoryPackInclude]
-        string MachineId => info.MachineId;
-
-        [MemoryPackInclude, MemoryPackAllowSerialize]
-        IPEndPoint IP => info.IP;
-
-        [MemoryPackInclude]
-        string Msg => info.Msg;
-
-
-        [MemoryPackConstructor]
-        SerializableSignInResponseInfo(bool status, string machineId, IPEndPoint ip, string msg)
-        {
-            var info = new SignInResponseInfo { Status = status, IP = ip, MachineId = machineId, Msg = msg };
-            this.info = info;
-        }
-
-        public SerializableSignInResponseInfo(SignInResponseInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
     public class SignInResponseInfoFormatter : MemoryPackFormatter<SignInResponseInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignInResponseInfo value)
@@ -592,7 +333,11 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignInResponseInfo(value));
+            writer.WriteObjectHeader(4);
+            writer.WriteValue(value.Status);
+            writer.WriteValue(value.MachineId);
+            writer.WriteValue(value.IP);
+            writer.WriteValue(value.Msg);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignInResponseInfo value)
@@ -604,38 +349,15 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignInResponseInfo>();
-            value = wrapped.info;
+            value = new SignInResponseInfo();
+            reader.TryReadObjectHeader(out byte count);
+            value.Status = reader.ReadValue<bool>();
+            value.MachineId = reader.ReadValue<string>();
+            value.IP = reader.ReadValue<IPEndPoint>();
+            value.Msg = reader.ReadValue<string>();
         }
     }
 
-
-
-    [MemoryPackable]
-    public readonly partial struct SerializableSignInConfigSetNameInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignInConfigSetNameInfo info;
-
-        [MemoryPackInclude]
-        string Id => info.Id;
-
-        [MemoryPackInclude]
-        string NewName => info.NewName;
-
-
-        [MemoryPackConstructor]
-        SerializableSignInConfigSetNameInfo(string id, string newName)
-        {
-            var info = new SignInConfigSetNameInfo { Id = id, NewName = newName };
-            this.info = info;
-        }
-
-        public SerializableSignInConfigSetNameInfo(SignInConfigSetNameInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
     public class SignInConfigSetNameInfoFormatter : MemoryPackFormatter<SignInConfigSetNameInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignInConfigSetNameInfo value)
@@ -646,7 +368,10 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignInConfigSetNameInfo(value));
+            writer.WriteObjectHeader(3);
+            writer.WriteValue(value.Id);
+            writer.WriteValue(value.Name);
+            writer.WriteValue(value.Avatar);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignInConfigSetNameInfo value)
@@ -658,38 +383,18 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignInConfigSetNameInfo>();
-            value = wrapped.info;
+            value = new SignInConfigSetNameInfo();
+            reader.TryReadObjectHeader(out byte count);
+            value.Id = reader.ReadValue<string>();
+            value.Name = reader.ReadValue<string>();
+
+            if (count > 2)
+            {
+                value.Avatar = reader.ReadValue<string>();
+            }
         }
     }
 
-
-
-    [MemoryPackable]
-    public readonly partial struct SerializableSignInPushArgInfo
-    {
-        [MemoryPackIgnore]
-        public readonly SignInPushArgInfo info;
-
-        [MemoryPackInclude]
-        string Key => info.Key;
-
-        [MemoryPackInclude]
-        string Value => info.Value;
-
-
-        [MemoryPackConstructor]
-        SerializableSignInPushArgInfo(string key, string value)
-        {
-            var info = new SignInPushArgInfo { Key = key, Value = value };
-            this.info = info;
-        }
-
-        public SerializableSignInPushArgInfo(SignInPushArgInfo signInfo)
-        {
-            this.info = signInfo;
-        }
-    }
     public class SignInPushArgInfoFormatter : MemoryPackFormatter<SignInPushArgInfo>
     {
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref SignInPushArgInfo value)
@@ -700,7 +405,9 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            writer.WritePackable(new SerializableSignInPushArgInfo(value));
+            writer.WriteObjectHeader(2);
+            writer.WriteValue(value.Key);
+            writer.WriteValue(value.Value);
         }
 
         public override void Deserialize(ref MemoryPackReader reader, scoped ref SignInPushArgInfo value)
@@ -712,8 +419,10 @@ namespace linker.messenger.serializer.memorypack
                 return;
             }
 
-            var wrapped = reader.ReadPackable<SerializableSignInPushArgInfo>();
-            value = wrapped.info;
+            value = new SignInPushArgInfo();
+            reader.TryReadObjectHeader(out byte count);
+            value.Key = reader.ReadValue<string>();
+            value.Value = reader.ReadValue<string>();
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using linker.libs;
-using linker.messenger.exroute;
+using linker.messenger.rpolicy;
 using linker.messenger.signin;
+using linker.messenger.tuntap.client;
 using linker.tun.device;
 using System.Net;
 
@@ -8,7 +9,7 @@ namespace linker.messenger.tuntap.cidr
 {
     public sealed class TuntapCidrDecenterManager
     {
-        private LinkerTunDeviceRouteItem[] routeItems = new LinkerTunDeviceRouteItem[0];
+        private LinkerTunDeviceRouteItem[] routeItems = [];
         public LinkerTunDeviceRouteItem[] Routes => routeItems;
         public Dictionary<string, string> CidrRoutes => cidrManager.Routes;
 
@@ -16,40 +17,52 @@ namespace linker.messenger.tuntap.cidr
         private readonly TuntapCidrConnectionManager tuntapCidrConnectionManager;
 
         private readonly ISignInClientStore signInClientStore;
-        private readonly TuntapConfigTransfer tuntapConfigTransfer;
         private readonly TuntapTransfer tuntapTransfer;
-        private readonly ExRouteTransfer exRouteTransfer;
+        private readonly RouteExclusionPolicyTransfer routeExclusionPolicyTransfer;
         private readonly SignInClientState signInClientState;
-        private readonly SignInClientTransfer signInClientTransfer;
         private readonly TuntapDecenter tuntapDecenter;
 
-        public TuntapCidrDecenterManager(TuntapCidrConnectionManager tuntapCidrConnectionManager, ISignInClientStore signInClientStore, SignInClientState signInClientState, TuntapConfigTransfer tuntapConfigTransfer, TuntapTransfer tuntapTransfer, ExRouteTransfer exRouteTransfer, SignInClientTransfer signInClientTransfer, TuntapDecenter tuntapDecenter)
+        public TuntapCidrDecenterManager(TuntapCidrConnectionManager tuntapCidrConnectionManager, ISignInClientStore signInClientStore,
+            SignInClientState signInClientState, TuntapTransfer tuntapTransfer,
+            RouteExclusionPolicyTransfer routeExclusionPolicyTransfer, TuntapDecenter tuntapDecenter)
         {
             this.tuntapCidrConnectionManager = tuntapCidrConnectionManager;
             this.signInClientStore = signInClientStore;
-            this.tuntapConfigTransfer = tuntapConfigTransfer;
             this.tuntapTransfer = tuntapTransfer;
-            this.exRouteTransfer = exRouteTransfer;
+            this.routeExclusionPolicyTransfer = routeExclusionPolicyTransfer;
             this.signInClientState = signInClientState;
-            this.signInClientTransfer = signInClientTransfer;
             this.tuntapDecenter = tuntapDecenter;
 
             tuntapDecenter.OnClear += Clear;
             tuntapDecenter.OnChanged += AddRoute;
         }
 
-        public void SetIPs(TuntapVeaLanIPAddress[] ips)
+        public void SetIPs(List<TuntapVeaLanIPAddressList> ips)
         {
             foreach (var ip in ips)
             {
-                tuntapCidrConnectionManager.RemoveNotMachine(ip.NetWork, ip.MaskValue, ip.MachineId);
+                foreach (var item in ip.IPS)
+                {
+                    tuntapCidrConnectionManager.RemoveNotMachine(item.NetWork, item.MaskValue, item.MachineId);
+                }
             }
-            cidrManager.Add(ips.Select(c => new CidrAddInfo<string> { IPAddress = c.IPAddress, PrefixLength = c.PrefixLength, Value = c.MachineId }).ToArray());
+            foreach (var ip in ips)
+            {
+                cidrManager.Add(ip.IPS.Select(c => new CidrAddInfo<string>
+                {
+                    IPAddress = c.IPAddress,
+                    PrefixLength = c.PrefixLength,
+                    Value = c.MachineId,
+                    DstIp = ip.DstIp,
+                    DstPrefixValue = ip.DstPrefixValue,
+                }).ToArray());
+            }
+
 
         }
-        public void SetIP(string machineId, uint ip)
+        public void SetIP(string machineId, uint ip, uint prefixValue)
         {
-            cidrManager.Add(new CidrAddInfo<string> { IPAddress = ip, PrefixLength = 32, Value = machineId });
+            cidrManager.Add(new CidrAddInfo<string> { IPAddress = ip, PrefixLength = 32, Value = machineId, DstIp = ip, DstPrefixValue = prefixValue });
             tuntapCidrConnectionManager.RemoveNotMachine(ip, machineId);
         }
         public void RemoveIP(string machineId)
@@ -57,9 +70,22 @@ namespace linker.messenger.tuntap.cidr
             cidrManager.Delete(machineId, (a, b) => a == b);
             tuntapCidrConnectionManager.Remove(machineId);
         }
-        public bool FindValue(uint ip, out string value)
+        public bool FindValue(uint ip, out string value, out uint dst, out uint prefix)
         {
-            return cidrManager.FindValue(ip, out value);
+            bool result = cidrManager.FindValue(ip, out CidrAddInfo<string> _value);
+
+            value = string.Empty;
+            dst = 0;
+            prefix = 0;
+            if (result)
+            {
+                value = _value.Value;
+                dst = _value.DstIp;
+                prefix = _value.DstPrefixValue;
+            }
+
+
+            return result;
         }
         private void Clear()
         {
@@ -70,19 +96,19 @@ namespace linker.messenger.tuntap.cidr
         private void AddRoute()
         {
             List<TuntapVeaLanIPAddressList> ipsList = ParseIPs(tuntapDecenter.Infos.Values.ToList());
-            TuntapVeaLanIPAddress[] ips = ipsList.SelectMany(c => c.IPS).ToArray();
             var _routeItems = ipsList.SelectMany(c => c.IPS).Select(c => new LinkerTunDeviceRouteItem { Address = c.OriginIPAddress, PrefixLength = c.PrefixLength }).ToArray();
 
             var removeItems = routeItems.Except(_routeItems, new LinkerTunDeviceRouteItemComparer()).ToArray();
             if (removeItems.Length > 0)
+            {
                 tuntapTransfer.RemoveRoute(removeItems);
-
+            }
             tuntapTransfer.AddRoute(_routeItems);
 
-            SetIPs(ips);
+            SetIPs(ipsList);
             foreach (var item in tuntapDecenter.Infos.Values.Where(c => c.Available && c.Exists == false))
             {
-                SetIP(item.MachineId, NetworkHelper.ToValue(item.IP));
+                SetIP(item.MachineId, NetworkHelper.ToValue(item.IP), NetworkHelper.ToPrefixValue(item.PrefixLength));
             }
             foreach (var item in tuntapDecenter.Infos.Values.Where(c => c.Available == false || c.Exists || c.IP.Equals(IPAddress.Any)))
             {
@@ -95,24 +121,26 @@ namespace linker.messenger.tuntap.cidr
         }
         private List<TuntapVeaLanIPAddressList> ParseIPs(List<TuntapInfo> infos)
         {
-            //排除的IP，
-            IEnumerable<uint> excludeIps = exRouteTransfer.Get().Where(c => c.Equals(IPAddress.Any) == false).Select(NetworkHelper.ToValue).Distinct();
-
-            if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
-                LoggerHelper.Instance.Warning($"tuntap route ex ips : {string.Join(",", excludeIps.Select(c => NetworkHelper.ToIP(c)).ToList())}");
-
-            HashSet<uint> hashSet = new HashSet<uint>();
             IPAddress wan = signInClientState.WanAddress.Address;
+            //排除的IP，
+            IEnumerable<uint> excludeIps = routeExclusionPolicyTransfer.Query().Where(c => c.Equals(IPAddress.Any) == false).Select(NetworkHelper.ToValue).Distinct();
 
-            foreach (var item in infos.Where(c => c.Available == true).OrderBy(c => c.IP, new IPAddressComparer()).OrderByDescending(c => c.Status))
+            HashSet<uint> hashSet =
+            [
+                //外网IP
+                NetworkHelper.ToValue(wan),
+            ];
+            //虚拟ip
+            foreach (var item in infos)
             {
-                item.Exists = item.IP.Equals(IPAddress.Any) == false && hashSet.Contains(NetworkHelper.ToValue(item.IP));
                 hashSet.Add(NetworkHelper.ToValue(item.IP));
+                hashSet.Add(NetworkHelper.ToNetworkValue(item.IP, item.PrefixLength));
             }
 
+            //局域网ip
             return infos
                 .Where(c => c.MachineId != signInClientStore.Id)
-                .Where(c => c.Available && c.Exists == false)
+                .Where(c => c.Available)
                 .OrderBy(c => c.IP, new IPAddressComparer()).OrderByDescending(c => c.Status)
                 .Select(c =>
                 {
@@ -123,21 +151,32 @@ namespace linker.messenger.tuntap.cidr
                     .Where(d =>
                     {
                         uint network = NetworkHelper.ToNetworkValue(d.IP, d.PrefixLength);
+                        uint ip = NetworkHelper.ToValue(d.IP);
 
-                        if (d.IP.Equals(d.MapIP))
+                        //同个外网，且没有设置映射
+                        bool sameWan = wan.Equals(c.Wan) && IPAddress.Any.Equals(d.MapIP) && d.IP.Equals(d.MapIP) == false;
+                        if (sameWan)
                         {
-                            d.Exists = hashSet.Contains(network);
+                            LoggerHelper.Instance.Warning($"tuntap lan {d.IP} exists with {c.Wan}={wan}");
                         }
-                        else
+
+                        //在排除列表中
+                        bool exclude = excludeIps.Any(e => NetworkHelper.ToNetworkValue(e, d.PrefixLength) == network);
+                        if (exclude)
                         {
-                            //同个外网，且没有设置映射
-                            d.Exists = (wan.Equals(c.Wan) && IPAddress.Any.Equals(d.MapIP))
-                            //在排除列表中
-                            || excludeIps.Any(e => NetworkHelper.ToNetworkValue(e, d.PrefixLength) == network)
-                            //已经存在过
-                            || hashSet.Contains(network);
+                            LoggerHelper.Instance.Warning($"tuntap lan {d.IP} exists with {string.Join(",", excludeIps.Select(c => c.ToString()))}");
                         }
+
+                        //已经存在过
+                        bool exists = hashSet.Contains(network) || hashSet.Contains(ip);
+                        if (exists)
+                        {
+                            LoggerHelper.Instance.Warning($"tuntap lan {d.IP} exists with {d.IP}");
+                        }
+                        d.Exists = sameWan || exclude || exists;
+
                         hashSet.Add(network);
+                        hashSet.Add(ip);
 
                         return d.Exists == false;
                     }).ToList();
@@ -145,6 +184,8 @@ namespace linker.messenger.tuntap.cidr
                     return new TuntapVeaLanIPAddressList
                     {
                         MachineId = c.MachineId,
+                        DstIp = NetworkHelper.ToValue(c.IP),
+                        DstPrefixValue = NetworkHelper.ToPrefixValue(c.PrefixLength),
                         IPS = ParseIPs(lans, c.MachineId),
                     };
                 }).ToList();

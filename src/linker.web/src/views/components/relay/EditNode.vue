@@ -1,38 +1,38 @@
 <template>
-   <el-dialog class="options-center" :title="$t('server.relayTitle')" destroy-on-close v-model="state.show" width="30rem" top="2vh">
+   <el-dialog append-to=".app-wrap" class="options-center" :title="$t('relay.title')" destroy-on-close v-model="state.show" width="30rem" top="2vh">
         <div>
             <el-form ref="ruleFormRef" :model="state.ruleForm" :rules="state.rules" label-width="auto">
-                <el-form-item :label="$t('server.relayName')" prop="Name">
+                <el-form-item :label="$t('relay.name')" prop="Name">
                     <el-input :disabled="data._manager==false" v-trim minlength="1" maxlength="32" show-word-limit v-model="state.ruleForm.Name" />
                 </el-form-item>
-                <el-form-item :label="$t('server.relayHost')" prop="Host">
+                <el-form-item :label="$t('relay.host')" prop="Host">
                     <el-input v-trim v-model="state.ruleForm.Host" />
                 </el-form-item>
-                <el-form-item :label="$t('server.relayConnection')" prop="Connections">
+                <el-form-item :label="$t('relay.conn')" prop="Connections">
                     <el-input-number :disabled="data._manager==false" v-model="state.ruleForm.Connections" :min="0" :max="65535"/>
                 </el-form-item>
-                <el-form-item :label="$t('server.relaySpeed')" prop="BandwidthEach">
+                <el-form-item :label="$t('relay.speed')" prop="BandwidthEach">
                     <el-input-number v-model="state.ruleForm.BandwidthEach" :min="0"/>Mbps
                 </el-form-item>
-                <el-form-item :label="$t('server.relaySpeed1')" prop="Bandwidth">
+                <el-form-item :label="$t('relay.speed1')" prop="Bandwidth">
                     <el-input-number :disabled="data._manager==false" v-model="state.ruleForm.Bandwidth" :min="0"/>Mbps
                 </el-form-item>
-                <el-form-item :label="$t('server.relayFlow')" prop="DataEachMonth">
+                <el-form-item :label="$t('relay.flow')" prop="DataEachMonth">
                     <el-input-number :disabled="data._manager==false" v-model="state.ruleForm.DataEachMonth" :min="0"/>GB <el-button size="small" @click="handleRefresh"><el-icon><Refresh /></el-icon></el-button>
                 </el-form-item>
-                <el-form-item :label="$t('server.relayFlowLast')" prop="DataRemain">
+                <el-form-item :label="$t('relay.flow.last')" prop="DataRemain">
                     <el-input-number :disabled="data._manager==false" v-model="state.ruleForm.DataRemain" :min="0" />byte
                 </el-form-item>
-                <el-form-item :label="$t('server.relayUrl')" prop="Url">
+                <el-form-item :label="$t('relay.url')" prop="Url">
                     <el-input :disabled="data._manager==false" v-trim v-model="state.ruleForm.Url" />
                 </el-form-item>
-                <el-form-item :label="$t('server.relayLogo')" prop="Logo">
+                <el-form-item :label="$t('relay.logo')" prop="Logo">
                     <el-input :disabled="data._manager==false" v-trim v-model="state.ruleForm.Logo" />
                 </el-form-item>
-                <el-form-item :label="$t('server.relayPublic')" prop="Public">
+                <el-form-item :label="$t('relay.public')" prop="Public">
                     <el-switch v-model="state.ruleForm.Public " size="small" />
                 </el-form-item>
-                <el-form-item :label="$t('server.relayAllow')" prop="Allow">
+                <el-form-item :label="$t('relay.allow')" prop="Allow">
                     <el-checkbox :disabled="data._manager==false" v-model="state.ruleForm.AllowTcp">TCP</el-checkbox>
                     <el-checkbox :disabled="data._manager==false" v-model="state.ruleForm.AllowUdp">UDP</el-checkbox>
                 </el-form-item>
@@ -91,7 +91,7 @@ export default {
 
                 relayUpdate(json).then((res)=>{
                     if(res){
-                        ElMessage.success(t('common.oper'));
+                        ElMessage.success(t('common.opered'));
                         state.show = false;
                         emit('success');
                     }else{

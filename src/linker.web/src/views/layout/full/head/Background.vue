@@ -11,19 +11,21 @@
 import {PictureRounded} from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus';
 import {  onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 export default {
     components:{PictureRounded},
     props:['name'],
     setup(props) {
 
+        const {t} = useI18n();
         const key = `bg-${props.name}`;
 
         const handleBg = ()=>{
             if(localStorage.getItem(key)){
-                ElMessageBox.confirm('清除背景？','Warning',
+                ElMessageBox.confirm(t('common.clearSure',['']),'Warning',
                     {
-                        confirmButtonText: '确定',
-                        cancelButtonText: '取消',
+                        confirmButtonText: t('common.confirm'),
+                        cancelButtonText: t('common.cancel'),
                         type: 'warning',
                     }
                 ).then(() => {

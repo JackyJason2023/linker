@@ -1,0 +1,8 @@
+{
+    "group": "管理分组",
+    "group.share": "分享分组",
+    "group.join": "加入分组",
+    "group.name": "名称",
+    "group.psswd": "密码",
+    "group.validate": "有名称或者id未设置的项"
+}

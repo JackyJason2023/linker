@@ -20,7 +20,7 @@ namespace linker.libs.web
         /// <summary>
         /// 开启web api
         /// </summary>
-        public void Start(int port)
+        public void Start(int port, bool ipv6 = false)
         {
             Task.Factory.StartNew(async () =>
             {

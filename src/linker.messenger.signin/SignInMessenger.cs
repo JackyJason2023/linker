@@ -21,7 +21,8 @@ namespace linker.messenger.signin
         public void Name(IConnection connection)
         {
             SignInConfigSetNameInfo info = serializer.Deserialize<SignInConfigSetNameInfo>(connection.ReceiveRequestWrap.Payload.Span);
-            signInClientStore.SetName(info.NewName);
+            signInClientStore.SetName(info.Name);
+            signInClientStore.SetAvatar(info.Avatar);
             signInClientTransfer.ReSignIn();
         }
 
@@ -45,11 +46,10 @@ namespace linker.messenger.signin
         }
 
         [MessengerId((ushort)SignInMessengerIds.SignIn)]
-#pragma warning disable CA1822 // 将成员标记为 static
         public void SignIn(IConnection connection)
 #pragma warning restore CA1822 // 将成员标记为 static
         {
-            connection.Disponse();
+            connection.Dispose();
             return;
         }
 
@@ -61,7 +61,7 @@ namespace linker.messenger.signin
 
             SignInfo info = serializer.Deserialize<SignInfo>(connection.ReceiveRequestWrap.Payload.Span);
 
-            LoggerHelper.Instance.Info($"sign in from >=v131 {connection.Address}->{info.ToJson()}");
+            //LoggerHelper.Instance.Info($"sign in from >=v131 {connection.Address}->{info.ToJson()}");
 
             info.Connection = connection;
             string msg = await signCaching.Sign(info).ConfigureAwait(false);
@@ -115,6 +115,10 @@ namespace linker.messenger.signin
                 {
                     list = list.Where(c => c.Version.Contains(request.Name) || c.IP.ToString().Contains(request.Name) || c.MachineName.Contains(request.Name) || request.Ids.Contains(c.MachineId));
                 }
+                else if (request.Ids.Length > 0)
+                {
+                    list = list.Where(c => request.Ids.Contains(c.MachineId));
+                }
 
                 if (string.IsNullOrWhiteSpace(request.Prop) == false)
                 {
@@ -142,6 +146,7 @@ namespace linker.messenger.signin
                 list = list.Skip((request.Page - 1) * request.Size).Take(request.Size);
 
                 List<SignCacheInfo> result = [cache, .. list];
+                string[] args = ["userid", "avatar"];
                 result = result.Select(c => new SignCacheInfo
                 {
                     Connected = c.Connected,
@@ -151,7 +156,7 @@ namespace linker.messenger.signin
                     MachineId = c.MachineId,
                     MachineName = c.MachineName,
                     Version = c.Version,
-                    Args = c.Args.Where(c => c.Key == "userid").ToDictionary(),
+                    Args = c.Args.Where(c => args.Contains(c.Key)).ToDictionary(),
                 }).ToList();
 
 

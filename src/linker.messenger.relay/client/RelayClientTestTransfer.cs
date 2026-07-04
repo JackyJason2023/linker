@@ -39,12 +39,18 @@ namespace linker.messenger.relay.client
                 Nodes = await transportRelay.RelayTestAsync().ConfigureAwait(false);
                 var tasks = Nodes.Select(async (c) =>
                 {
-                    IPEndPoint ep = NetworkHelper.GetEndPoint(c.Host, 1802);
-                    IPAddress ip = ep.Address.Equals(IPAddress.Any) || ep.Address.Equals(IPAddress.Loopback) ? signInClientState.Connection.Address.Address : ep.Address;
+                    try
+                    {
+                        IPEndPoint ep = NetworkHelper.GetEndPoint(c.Host, 1802);
+                        IPAddress ip = ep.Address.Equals(IPAddress.Any) || ep.Address.Equals(IPAddress.Loopback) ? signInClientState.Connection.Address.Address : ep.Address;
 
-                    using Ping ping = new Ping();
-                    var resp = await ping.SendPingAsync(ip, 1000);
-                    c.Delay = resp.Status == IPStatus.Success ? (int)resp.RoundtripTime : -1;
+                        using Ping ping = new Ping();
+                        var resp = await ping.SendPingAsync(ip, 1000);
+                        c.Delay = resp.Status == IPStatus.Success ? (int)resp.RoundtripTime : -1;
+                    }
+                    catch (Exception)
+                    {
+                    }
                 });
                 await Task.WhenAll(tasks).ConfigureAwait(false);
             }

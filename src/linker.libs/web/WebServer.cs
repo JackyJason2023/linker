@@ -9,7 +9,6 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace linker.libs.web
 {
@@ -321,7 +320,7 @@ namespace linker.libs.web
             }
             catch (Exception ex)
             {
-                LoggerHelper.Instance.Error($"{model.Path} -> {ex.Message}");
+                LoggerHelper.Instance.Error($"{model.Path} -> {ex}");
                 return new ApiControllerResponseInfo
                 {
                     Content = ex.Message,

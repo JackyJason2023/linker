@@ -1,0 +1,14 @@
+{
+    "permission.closed": "Closed",
+    "permission.simple": "Simple",
+    "permission.full": "Full",
+    "permission.clear": "Clear connection",
+    
+    "api.title":"Manager API",
+    "api.api":"API",
+    "api.pwd":"Password",
+    "api.remember":"Remember {0}",
+    "api": "Manager api",
+    "api.clear": "Clear",
+    "api.alter": "Alter"
+}

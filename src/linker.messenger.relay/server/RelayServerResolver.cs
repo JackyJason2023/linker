@@ -82,7 +82,7 @@ namespace linker.messenger.relay.server
 
         public async Task Resolve(Socket socket, IPEndPoint ep, Memory<byte> memory)
         {
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         public async Task Resolve(Socket socket, Memory<byte> memory)
         {
@@ -94,11 +94,17 @@ namespace linker.messenger.relay.server
 
             try
             {
+                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                    LoggerHelper.Instance.Warning($"server relay begin get message");
                 RelayMessageInfo relayMessage = await GetMessage(socket).ConfigureAwait(false);
                 if(relayMessage == null)
                 {
+                    LoggerHelper.Instance.Error($"server relay get message:fail");
+                    await socket.SendAsync(Helper.FalseArray).ConfigureAwait(false);
                     return;
                 }
+                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                    LoggerHelper.Instance.Warning($"server relay get message:{relayMessage.ToJson()}");
                 //获取缓存
                 RelayCacheInfo relayCache = await relayServerNodeTransfer.TryGetRelayCache(relayMessage).ConfigureAwait(false);
                 if (relayCache == null)
@@ -134,14 +140,14 @@ namespace linker.messenger.relay.server
 
                 TaskCompletionSource<Socket> tcs = new TaskCompletionSource<Socket>(TaskCreationOptions.RunContinuationsAsynchronously);
                 Socket answerSocket = null;
-                IPEndPoint fromep = socket.RemoteEndPoint as IPEndPoint, toep = null;
+                IPEndPoint fromep = (socket.RemoteEndPoint as IPEndPoint).MapToIPv4(), toep = null;
                 try
                 {
                     await socket.SendAsync(Helper.TrueArray).ConfigureAwait(false);
                     relayDic.TryAdd(relayCache.FlowId, tcs);
                     answerSocket = await tcs.WithTimeout(TimeSpan.FromMilliseconds(15000)).ConfigureAwait(false);
                     await answerSocket.SendAsync(Helper.TrueArray).ConfigureAwait(false);
-                    toep = answerSocket.RemoteEndPoint as IPEndPoint;
+                    toep = (answerSocket.RemoteEndPoint as IPEndPoint).MapToIPv4();
 
                     LoggerHelper.Instance.Info($"relay server start {fromep} to {toep}");
 
@@ -213,7 +219,7 @@ namespace linker.messenger.relay.server
                     }
 
                     Add(trafficCacheInfo.Key, trafficCacheInfo.Cache1.FromName, trafficCacheInfo.Cache1.ToName, trafficCacheInfo.Cache1.GroupId, bytesRead, bytesRead);
-                    await destination.SendAsync(buffer.Memory.Slice(0, bytesRead), SocketFlags.None).ConfigureAwait(false);
+                    await destination.SendAllAsync(buffer.Memory.Slice(0, bytesRead)).ConfigureAwait(false);
                 }
             }
             catch (Exception)

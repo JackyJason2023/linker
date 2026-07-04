@@ -40,7 +40,7 @@ import Head from './Head.vue';
 import List from './List.vue';
 import Status from '@/views/components/status/Index.vue'
 import { computed } from 'vue';
-import NoPermission from '../../NoPermission.vue';
+import NoPermission from '../../components/ws/NoPermission.vue';
 export default {
     components:{Head,List,Status,NoPermission},
     setup () {

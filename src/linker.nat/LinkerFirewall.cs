@@ -11,8 +11,8 @@ namespace linker.nat
     /// </summary>
     public sealed class LinkerFirewall
     {
-        private readonly ConcurrentDictionary<(string srcId, uint dst, ushort dstPort, ProtocolType pro), bool> cacheDstMap = new();
-        private readonly ConcurrentDictionary<(uint src, ushort srcPort, uint dst, ushort dstPort, ProtocolType pro), SrcCacheInfo> cacheSrcMap = new();
+        private readonly ConcurrentDictionary<DstKey, bool> cacheDstMap = new(new DstKeyComparer());
+        private readonly ConcurrentDictionary<SrcKey, SrcCacheInfo> cacheSrcMap = new(new SrcKeyComparer());
 
         private List<LinkerFirewallRuleBuildInfo> buildedRules = [];
         private LinkerFirewallState state = LinkerFirewallState.Disabled;
@@ -132,7 +132,7 @@ namespace linker.nat
                 FirewallPacket ipv4 = new FirewallPacket(ptr);
                 if (ipv4.Version == 4 && (ipv4.Protocol == ProtocolType.Udp || ipv4.Protocol == ProtocolType.Tcp))
                 {
-                    (uint src, ushort srcPort, uint dst, ushort dstPort, ProtocolType pro) key = (ipv4.SrcAddr, ipv4.SrcPort, ipv4.DstAddr, ipv4.DstPort, ipv4.Protocol);
+                    SrcKey key = new SrcKey(ipv4.SrcAddr, ipv4.SrcPort, ipv4.DstAddr, ipv4.DstPort, ipv4.Protocol);
                     if (cacheSrcMap.TryGetValue(key, out SrcCacheInfo cache) == false)
                     {
                         cache = new SrcCacheInfo { Type = SrcCacheType.Out };
@@ -184,7 +184,7 @@ namespace linker.nat
                 if (ipv4.Version == 4 && (ipv4.Protocol == ProtocolType.Udp || ipv4.Protocol == ProtocolType.Tcp))
                 {
                     //连接状态
-                    (uint src, ushort srcPort, uint dst, ushort dstPort, ProtocolType pro) key = (ipv4.DstAddr, ipv4.DstPort, ipv4.SrcAddr, ipv4.SrcPort, ipv4.Protocol);
+                    SrcKey key =new SrcKey (ipv4.DstAddr, ipv4.DstPort, ipv4.SrcAddr, ipv4.SrcPort, ipv4.Protocol);
                     if (cacheSrcMap.TryGetValue(key, out SrcCacheInfo cache) == false)
                     {
                         cache = new SrcCacheInfo { Type = SrcCacheType.In };
@@ -211,7 +211,7 @@ namespace linker.nat
             };
 
             //之前已经检查过
-            (string srcId, uint dst, ushort dstPort, ProtocolType pro) key = (srcId, ip, port, protocol);
+            DstKey key = new DstKey(srcId, ip, port, protocol);
             if (cacheDstMap.TryGetValue(key, out bool value))
             {
                 return value;
@@ -276,24 +276,13 @@ namespace linker.nat
         {
             private readonly byte* ptr;
 
-            /// <summary>
-            /// 协议版本
-            /// </summary>
             public readonly byte Version => (byte)((*ptr >> 4) & 0b1111);
+
             public readonly ProtocolType Protocol => (ProtocolType)(*(ptr + 9));
 
-            /// <summary>
-            /// IP头长度
-            /// </summary>
             public readonly int IPHeadLength => (*ptr & 0b1111) * 4;
-            /// <summary>
-            /// IP包荷载数据指针，也就是TCP/UDP头指针
-            /// </summary>
             public readonly byte* PayloadPtr => ptr + IPHeadLength;
 
-            /// <summary>
-            /// 源地址
-            /// </summary>
             public readonly uint SrcAddr
             {
                 get
@@ -305,9 +294,7 @@ namespace linker.nat
                     *(uint*)(ptr + 12) = BinaryPrimitives.ReverseEndianness(value);
                 }
             }
-            /// <summary>
-            /// 源端口
-            /// </summary>
+
             public readonly ushort SrcPort
             {
                 get
@@ -319,9 +306,7 @@ namespace linker.nat
                     *(ushort*)(PayloadPtr) = BinaryPrimitives.ReverseEndianness(value);
                 }
             }
-            /// <summary>
-            /// 目的地址
-            /// </summary>
+
             public readonly uint DstAddr
             {
                 get
@@ -333,9 +318,7 @@ namespace linker.nat
                     *(uint*)(ptr + 16) = BinaryPrimitives.ReverseEndianness(value);
                 }
             }
-            /// <summary>
-            /// 目标端口
-            /// </summary>
+
             public readonly ushort DstPort
             {
                 get
@@ -347,11 +330,6 @@ namespace linker.nat
                     *(ushort*)(PayloadPtr + 2) = BinaryPrimitives.ReverseEndianness(value);
                 }
             }
-
-            /// <summary>
-            /// 加载TCP/IP包，必须是一个完整的TCP/IP包
-            /// </summary>
-            /// <param name="ptr">一个完整的TCP/IP包</param>
             public FirewallPacket(byte* ptr)
             {
                 this.ptr = ptr;
@@ -390,8 +368,63 @@ namespace linker.nat
     }
 
 
+    readonly struct DstKey
+    {
+        public readonly string SrcId;
+        public readonly uint DstIp;
+        public readonly ushort DstPort;
+        public readonly ProtocolType Protocol;
 
+        public DstKey(string srcId, uint dstIp, ushort dstPort, ProtocolType protocol)
+        {
+            SrcId = srcId;
+            DstIp = dstIp;
+            DstPort = dstPort;
+            Protocol = protocol;
+        }
+    }
+    class DstKeyComparer : IEqualityComparer<DstKey>
+    {
+        public bool Equals(DstKey x, DstKey y) =>
+                  x.SrcId == y.SrcId &&
+                  x.DstIp == y.DstIp &&
+                  x.DstPort == y.DstPort &&
+                  x.Protocol == y.Protocol;
 
+        public int GetHashCode(DstKey obj)
+        {
+            return HashCode.Combine(obj.SrcId, obj.DstIp, obj.DstPort, obj.Protocol);
+        }
+    }
+    readonly struct SrcKey
+    {
+        public readonly uint SrcIp;
+        public readonly ushort SrcPort;
+        public readonly uint DstIp;
+        public readonly ushort DstPort;
+        public readonly ProtocolType Protocol;
 
+        public SrcKey(uint srcIp, ushort srcPort, uint dstIp, ushort dstPort, ProtocolType protocol)
+        {
+            SrcIp = srcIp;
+            SrcPort = srcPort;
+            DstIp = dstIp;
+            DstPort = dstPort;
+            Protocol = protocol;
+        }
+    }
+    class SrcKeyComparer : IEqualityComparer<SrcKey>
+    {
+        public bool Equals(SrcKey x, SrcKey y) =>
+                  x.SrcIp == y.SrcIp &&
+                  x.SrcPort == y.SrcPort &&
+                  x.DstIp == y.DstIp &&
+                  x.DstPort == y.DstPort &&
+                  x.Protocol == y.Protocol;
 
+        public int GetHashCode(SrcKey obj)
+        {
+            return HashCode.Combine(obj.SrcIp, obj.SrcPort, obj.DstIp, obj.DstPort, obj.Protocol);
+        }
+    }
 }

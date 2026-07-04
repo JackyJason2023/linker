@@ -10,7 +10,6 @@ export const provideGlobalData = () => {
         isPhone:computed(()=>globalData.value.width < 800),
         isPc:computed(()=>globalData.value.width >= 800),
         bufferSize: ['1KB', '2KB', '4KB', '8KB', '16KB', '32KB', '64KB', '128KB', '256KB', '512KB', '1024KB'],
-        //配置信息
         config: {
             Common: {},
             Client: { Servers: [], Accesss: {},AccessBits:'' },
@@ -23,10 +22,8 @@ export const provideGlobalData = () => {
             },
             configed: false
         },
-        //登录信息
         signin: { Connected: false, Version: 'v1.0.0.0',Super:false,SignInHost:'' },
-        self: {}, //本机
-        //已连接
+        self: {},
         api: { connected: false },
     
         hasAccess(name) {

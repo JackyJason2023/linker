@@ -33,10 +33,11 @@ namespace linker.messenger.updater
             signInClientState.OnSignInSuccessFirstTime += Init;
 
         }
-        private void Init()
+        private Task Init()
         {
             UpdateTask();
             updateInfo.Update();
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -157,7 +158,7 @@ namespace linker.messenger.updater
         {
             if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                 LoggerHelper.Instance.Info($"check update");
-            _ = GetUpdateInfo();
+            _ = GetUpdateInfo().ConfigureAwait(false);
         }
         private async Task GetUpdateInfo()
         {

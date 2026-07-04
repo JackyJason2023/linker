@@ -49,6 +49,10 @@ namespace linker.messenger.updater
                 using HttpClient httpClient = new HttpClient(handler);
                 string str = await httpClient.GetStringAsync($"{updaterCommonTransfer.UpdateUrl}/version.txt",cts.Token).ConfigureAwait(false);
                 string[] arr = str.Split(Environment.NewLine).Select(c => c.Trim('\r').Trim('\n')).ToArray();
+                if (arr.Length == 1)
+                {
+                    arr = str.Split('\n').Select(c => c.Trim('\r').Trim('\n')).ToArray();
+                }
                 string version = arr[0];
                 string datetime = DateTime.Parse(arr[1]).ToString("yyyy-MM-dd HH:mm:ss");
                 string[] msg = arr.Skip(2).ToArray();
@@ -65,6 +69,11 @@ namespace linker.messenger.updater
         }
         public virtual (string, string) DownloadUrlAndSavePath(string version)
         {
+            if (File.Exists("linker.dll"))
+            {
+                return ($"{updaterCommonTransfer.UpdateUrl}/{version}/linker-any.zip", "updater.zip");
+            }
+
             if (OperatingSystem.IsWindows() || OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
             {
                 StringBuilder sb = new StringBuilder("linker-");
@@ -85,6 +94,9 @@ namespace linker.messenger.updater
                 processs(100, 100);
                 return;
             }
+
+            ClearTempFiles("./web/",".css");
+            ClearTempFiles("./web/",".js");
 
             using ZipArchive archive = ZipFile.OpenRead("updater.zip");
 
@@ -177,12 +189,12 @@ namespace linker.messenger.updater
         {
             ClearTempFiles();
         }
-        private void ClearTempFiles(string path = "./")
+        private void ClearTempFiles(string path = "./",string ext = ".temp")
         {
             string fullPath = Path.Join(Helper.CurrentDirectory, path);
             if (Directory.Exists(fullPath))
             {
-                foreach (var item in Directory.GetFiles(fullPath).Where(c => c.EndsWith(".temp")))
+                foreach (var item in Directory.GetFiles(fullPath).Where(c => c.EndsWith(ext)))
                 {
                     try
                     {
@@ -194,7 +206,7 @@ namespace linker.messenger.updater
                 }
                 foreach (var item in Directory.GetDirectories(fullPath))
                 {
-                    ClearTempFiles(item);
+                    ClearTempFiles(item, ext);
                 }
             }
         }

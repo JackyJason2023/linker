@@ -39,7 +39,13 @@ namespace linker.tunnel.transport
 
         public byte Order => 2;
 
-        public Action<ITunnelConnection> OnConnected { get; set; } = (state) => { };
+        public bool EnableAddr => true;
+
+        public Action<ITunnelConnection, TunnelTransportInfo> OnConnected { get; set; } = (state, info) => { };
+
+        private readonly string authStr = "GET /snltty/tcp/index.html HTTP/1.1\r\nHost: www.snltty.com\r\nConnection: keep-alive\r\nTransfer-Encoding: chunked\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nCookie: {0}\r\n\r\n";
+        private readonly string endStr = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: keep-alive\r\nContent-Type: text/html\r\nCookie: {0}\r\n\r\nOK";
+        private readonly byte[] cookieBytes = Encoding.UTF8.GetBytes("Cookie: ");
 
 
         private readonly ConcurrentDictionary<string, TaskCompletionSource<Socket>> distDic = new ConcurrentDictionary<string, TaskCompletionSource<Socket>>();
@@ -57,10 +63,8 @@ namespace linker.tunnel.transport
 
 
         Socket socket;
-        SemaphoreSlim slim = new SemaphoreSlim(1);
         public async Task Listen(int localPort)
         {
-            await slim.WaitAsync().ConfigureAwait(false);
             try
             {
                 if (localPort == 0) return;
@@ -104,10 +108,10 @@ namespace linker.tunnel.transport
                                 int length = await client.ReceiveAsync(buffer.Memory, cts.Token).ConfigureAwait(false);
                                 if (length > 0)
                                 {
-                                    string key = buffer.Memory.Slice(0, length).GetString();
+                                    string key = GetKey(buffer.Memory.Slice(0, length));
                                     if (distDic.TryRemove(key, out TaskCompletionSource<Socket> tcs))
                                     {
-                                        await client.SendAsync(buffer.Memory.Slice(0, length)).ConfigureAwait(false);
+                                        await client.SendAsync(Encoding.UTF8.GetBytes(string.Format(endStr, key))).ConfigureAwait(false);
                                         tcs.TrySetResult(client);
                                         return;
                                     }
@@ -132,10 +136,6 @@ namespace linker.tunnel.transport
                 {
                     LoggerHelper.Instance.Error(ex);
                 }
-            }
-            finally
-            {
-                slim.Release();
             }
         }
 
@@ -210,7 +210,7 @@ namespace linker.tunnel.transport
                 }
                 _ = WaitConnect(tunnelTransportInfo).ContinueWith((result) =>
                 {
-                    OnConnected(result.Result);
+                    OnConnected(result.Result, tunnelTransportInfo);
                 });
             }
             //我要连它，那就连接
@@ -227,7 +227,7 @@ namespace linker.tunnel.transport
                 ITunnelConnection connection = await ConnectForward(tunnelTransportInfo).ConfigureAwait(false);
                 if (connection != null)
                 {
-                    OnConnected(connection);
+                    OnConnected(connection, tunnelTransportInfo);
                     await tunnelMessengerAdapter.SendConnectSuccess(tunnelTransportInfo).ConfigureAwait(false);
                 }
                 else
@@ -249,12 +249,13 @@ namespace linker.tunnel.transport
             TaskCompletionSource<Socket> tcs = new TaskCompletionSource<Socket>(TaskCreationOptions.RunContinuationsAsynchronously);
             string key = $"{tunnelTransportInfo.Remote.MachineId}-{tunnelTransportInfo.FlowId}";
             distDic.TryAdd(key, tcs);
+            Socket socket = null;
+            SslStream sslStream = null;
             try
             {
-                Socket socket = await tcs.WithTimeout(TimeSpan.FromMilliseconds(5000)).ConfigureAwait(false);
-
+                socket = await tcs.WithTimeout(TimeSpan.FromMilliseconds(5000)).ConfigureAwait(false);
                 socket.KeepAlive();
-                SslStream sslStream = null;
+
                 if (tunnelTransportInfo.SSL)
                 {
                     if (certificate == null)
@@ -265,9 +266,14 @@ namespace linker.tunnel.transport
                     }
 
                     sslStream = new SslStream(new NetworkStream(socket, false), false, ValidateServerCertificate, null);
-#pragma warning disable SYSLIB0039 // 类型或成员已过时
-                    await sslStream.AuthenticateAsServerAsync(certificate, OperatingSystem.IsAndroid(), SslProtocols.Tls13 | SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls, false).ConfigureAwait(false);
-#pragma warning restore SYSLIB0039 // 类型或成员已过时
+                    using CancellationTokenSource _cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(5000));
+                    await sslStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
+                    {
+                        ServerCertificate = certificate,
+                        EnabledSslProtocols = SslProtocols.Tls13 | SslProtocols.Tls12,
+                        CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
+                        ClientCertificateRequired = OperatingSystem.IsAndroid(),
+                    }, _cts.Token).ConfigureAwait(false);
                 }
 
                 TunnelConnectionTcp result = new TunnelConnectionTcp
@@ -281,9 +287,9 @@ namespace linker.tunnel.transport
                     Type = TunnelType,
                     Mode = TunnelMode.Server,
                     TransactionId = tunnelTransportInfo.TransactionId,
-                    TransactionTag = tunnelTransportInfo.TransactionTag,
+                    Configure = tunnelTransportInfo.Configure,
                     TransportName = tunnelTransportInfo.TransportName,
-                    IPEndPoint = NetworkHelper.TransEndpointFamily(socket.RemoteEndPoint as IPEndPoint),
+                    IPEndPoint = (socket.RemoteEndPoint as IPEndPoint).MapToIPv4(),
                     Label = string.Empty,
                     SSL = tunnelTransportInfo.SSL,
                     BufferSize = tunnelTransportInfo.BufferSize,
@@ -293,6 +299,8 @@ namespace linker.tunnel.transport
             catch (Exception)
             {
                 tcs.TrySetResult(null);
+                socket?.SafeClose();
+                sslStream?.Dispose();
             }
             finally
             {
@@ -304,7 +312,7 @@ namespace linker.tunnel.transport
         {
             if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
             {
-                LoggerHelper.Instance.Warning($"{Name} connect to {tunnelTransportInfo.Remote.MachineId}->{tunnelTransportInfo.Remote.MachineName} {string.Join("\r\n", tunnelTransportInfo.RemoteEndPoints.Select(c => c.ToString()))}");
+                LoggerHelper.Instance.Warning($"{Name} connect to {tunnelTransportInfo.Remote.MachineId}->{tunnelTransportInfo.Remote.MachineName} {tunnelTransportInfo.RemoteEndPoints.FirstOrDefault()}");
             }
 
             List<IPEndPoint> eps = tunnelTransportInfo.RemoteEndPoints.Select(c => c.Address).Distinct().Select(c => new IPEndPoint(c, tunnelTransportInfo.Remote.PortMapWan)).ToList();
@@ -321,13 +329,11 @@ namespace linker.tunnel.transport
                     targetSocket.IPv6Only(ep.AddressFamily, false);
                     targetSocket.ReuseBind(new IPEndPoint(ep.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any, tunnelTransportInfo.Local.Local.Port));
 
-                    if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
-                    {
-                        LoggerHelper.Instance.Warning($"{Name} connect to {tunnelTransportInfo.Remote.MachineId}->{tunnelTransportInfo.Remote.MachineName} {ep}");
-                    }
                     await targetSocket.ConnectAsync(ep, cts.Token).ConfigureAwait(false);
 
-                    await targetSocket.SendAsync($"{tunnelTransportInfo.Local.MachineId}-{tunnelTransportInfo.FlowId}".ToBytes()).ConfigureAwait(false);
+                    string key = $"{tunnelTransportInfo.Local.MachineId}-{tunnelTransportInfo.FlowId}";
+                    byte[] sendt = Encoding.UTF8.GetBytes(string.Format(authStr, key));
+                    await targetSocket.SendAsync(sendt).ConfigureAwait(false);
                     await targetSocket.ReceiveAsync(buffer.Memory, cts.Token).ConfigureAwait(false);
 
                     //需要ssl
@@ -335,23 +341,21 @@ namespace linker.tunnel.transport
                     if (tunnelTransportInfo.SSL)
                     {
                         sslStream = new SslStream(new NetworkStream(targetSocket, false), false, ValidateServerCertificate, null);
-#pragma warning disable SYSLIB0039 // 类型或成员已过时
                         await sslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
                         {
-                            EnabledSslProtocols = SslProtocols.Tls13 | SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls,
+                            EnabledSslProtocols = SslProtocols.Tls13 | SslProtocols.Tls12,
                             CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
-                            ClientCertificates = new X509CertificateCollection { certificate }
+                            ClientCertificates = new X509CertificateCollection { certificate },
                         }, cts.Token).ConfigureAwait(false);
-#pragma warning restore SYSLIB0039 // 类型或成员已过时
                     }
 
                     return new TunnelConnectionTcp
                     {
                         Stream = sslStream,
                         Socket = targetSocket,
-                        IPEndPoint = NetworkHelper.TransEndpointFamily(targetSocket.RemoteEndPoint as IPEndPoint),
+                        IPEndPoint = (targetSocket.RemoteEndPoint as IPEndPoint).MapToIPv4(),
                         TransactionId = tunnelTransportInfo.TransactionId,
-                        TransactionTag = tunnelTransportInfo.TransactionTag,
+                        Configure = tunnelTransportInfo.Configure,
                         RemoteMachineId = tunnelTransportInfo.Remote.MachineId,
                         RemoteMachineName = tunnelTransportInfo.Remote.MachineName,
                         TransportName = Name,
@@ -377,7 +381,25 @@ namespace linker.tunnel.transport
         }
         private bool ValidateServerCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
+            if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+            {
+                LoggerHelper.Instance.Info($"【P2P {Name}】Certificate validation: {certificate?.Subject}");
+                LoggerHelper.Instance.Info($"【P2P {Name}】SSL Policy Errors: {sslPolicyErrors}");
+            }
             return true;
+        }
+
+        private string GetKey(Memory<byte> memory)
+        {
+            var span = memory.Span;
+            int start = span.IndexOf(cookieBytes);
+            if (start == -1)
+            {
+                return string.Empty;
+            }
+
+            int end = span.Slice(start).IndexOf(Encoding.UTF8.GetBytes("\r\n"));
+            return Encoding.UTF8.GetString(span.Slice(start + cookieBytes.Length, end - cookieBytes.Length));
         }
     }
 }

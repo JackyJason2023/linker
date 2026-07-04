@@ -1,24 +1,24 @@
 <template>
-    <el-dialog :title="$t('status.flowMessenger')" class="options-center" top="1vh" destroy-on-close v-model="state.show" width="680">
+    <el-dialog append-to=".app-wrap" :title="$t('flow.messenger')" class="options-center" top="1vh" destroy-on-close v-model="state.show" width="680">
         <div>
             <el-table :data="state.list" stripe border size="small" width="100%" height="60vh">
-                <el-table-column prop="id" label="id" width="200"></el-table-column>
-                <el-table-column prop="sendtBytes" :label="$t('status.flowUpload')" sortable>
+                <el-table-column prop="id" label="id" width="80"></el-table-column>
+                <el-table-column prop="sendtBytes" :label="$t('flow.upload')" sortable>
                     <template #default="scope">
                         <span>{{ scope.row.sendtBytesText }}</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="sendtSpeed" :label="$t('status.flowUpload')" sortable>
+                <el-table-column prop="sendtSpeed" :label="$t('flow.upload')" sortable>
                     <template #default="scope">
                         <span>{{ scope.row.sendtSpeedText }}/s</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="receiveBytes"  :label="$t('status.flowDownload')" sortable>
+                <el-table-column prop="receiveBytes"  :label="$t('flow.download')" sortable>
                     <template #default="scope">
                         <span>{{ scope.row.receiveBytesText }}</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="receiveSpeed" :label="$t('status.flowDownload')" sortable>
+                <el-table-column prop="receiveSpeed" :label="$t('flow.download')" sortable>
                     <template #default="scope">
                         <span>{{ scope.row.receiveSpeedText }}/s</span>
                     </template>
@@ -60,9 +60,8 @@ export default {
                 for(let j in res){
                     const item = res[j];
                     const itemOld = old[j];
-                    const text = `[${j}]${t(`status.messenger${j}`) || `unknown`}`;
                     list.push({
-                        id:text,
+                        id:j,
 
                         sendtBytes:item.SendtBytes,
                         sendtBytesText:parseSpeed(item.SendtBytes),

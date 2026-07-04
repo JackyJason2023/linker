@@ -1,12 +1,12 @@
 <template>
     <div class="head-wrap">
         <div class="tools flex">
-            <span class="label">分组 : {{state.group}}</span>
+            <span class="label">{{ $t('group') }} : {{state.group}}</span>
             <span class="flex-1"></span>
             <el-button size="small" @click="handleRefresh">
-                刷新(F5)<el-icon><Refresh /></el-icon>
+                {{$t('common.refresh')}}(F5)<el-icon><Refresh /></el-icon>
             </el-button>
-            <div style="margin-left:1rem ;">
+            <div class="mgl-1">
                 <Background name="net" ></Background>
             </div>
         </div>

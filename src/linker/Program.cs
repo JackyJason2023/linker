@@ -1,10 +1,11 @@
 ﻿using linker.libs;
-using System.ServiceProcess;
-using System.Diagnostics;
 using linker.messenger.entry;
+using linker.messenger.store.file;
+using System.Diagnostics;
+using System.Net;
+using System.ServiceProcess;
 using System.Text;
 using System.Text.Json;
-using linker.messenger.store.file;
 
 namespace linker
 {
@@ -12,13 +13,15 @@ namespace linker
     {
         static async Task Main(string[] args)
         {
-
+            Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
 #if DEBUG
 #else
-            //添加防火墙，不添加ICMP
-            linker.libs.FireWallHelper.WriteAny(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+            linker.libs.FireWallHelper.Write(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
 #endif
-            //全局异常
+
+            AppContext.SetSwitch("System.Net.Security.DisableServerNameChecks", true);
+            ServicePointManager.CheckCertificateRevocationList = false;
+
             AppDomain.CurrentDomain.UnhandledException += (a, b) =>
             {
                 LoggerHelper.Instance.Error(b.ExceptionObject + "");
@@ -31,15 +34,8 @@ namespace linker
             };
             */
 
+            Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 
-            //线程数
-            //ThreadPool.SetMinThreads(1024, 1024);
-            //ThreadPool.SetMaxThreads(65535, 65535);
-
-            string serviceDirectory = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
-            Directory.SetCurrentDirectory(serviceDirectory);
-
-            //windows服务运行
             if (Environment.UserInteractive == false && OperatingSystem.IsWindows())
             {
                 ServiceBase[] ServicesToRun;
@@ -49,7 +45,6 @@ namespace linker
                 };
                 ServiceBase.Run(ServicesToRun);
             }
-            //正常运行
             else
             {
                 Run(args);
@@ -115,7 +110,6 @@ namespace linker
                     break;
             }
         }
-
         private static JsonDocument ParseArgs(string[] args)
         {
 

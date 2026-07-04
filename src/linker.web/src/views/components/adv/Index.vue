@@ -53,17 +53,14 @@ export default {
 </script>
 
 <style lang="stylus" scoped>
-html.dark .adv-wrap .inner{
-    border-color:#333;
-}
 .adv-wrap{
-    padding:1rem 1rem 0 1rem;
+    padding:1.5rem 1.5rem 0 1.5rem;
+    margin-bottom:-0.5rem
 
     .inner{
-        border:1px solid #ddd;
-        padding:.6rem;
-        border-radius.4rem;
-        box-shadow: 0 0 6px 2px rgba(0, 0, 0, 0.05);
+        border:1px solid var(--table-border-color);
+        padding:.4rem;
+        // background: #fff;
     }
 }
 </style>

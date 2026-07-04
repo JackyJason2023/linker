@@ -15,6 +15,7 @@ using linker.libs.extends;
 using linker.libs.web;
 using linker.messenger.entry;
 using linker.messenger.tuntap;
+using linker.messenger.tuntap.client;
 using linker.messenger.updater;
 using linker.nat;
 using linker.tun.device;
@@ -107,28 +108,29 @@ namespace linker.app
             tuntapTransfer.Shutdown();
         }
 
-        public async Task Callback(LinkerTunDevicPacket packet)
+        public  ValueTask<bool> Callback(LinkerTunDevicPacket packet)
         {
-            await tuntapProxy.InputPacket(packet).ConfigureAwait(false);
+            return   tuntapProxy.InputPacket(packet);
         }
-        public async Task Callback(LinkerSrcProxyReadPacket packet)
+        public  ValueTask<bool> Callback(LinkerSrcProxyReadPacket packet)
         {
-            await tuntapProxy.InputPacket(packet).ConfigureAwait(false);
+            return   tuntapProxy.InputPacket(packet);
         }
-        public bool Callback(uint ip)
+        public int Callback(uint ip)
         {
             return tuntapProxy.TestIp(ip);
         }
-        public async ValueTask Close(ITunnelConnection connection)
+        public  ValueTask Close(ITunnelConnection connection)
         {
             //tuntapDecenter.Refresh();
-            await ValueTask.CompletedTask.ConfigureAwait(false);
+            return ValueTask.CompletedTask;
         }
-        public async ValueTask Receive(ITunnelConnection connection, ReadOnlyMemory<byte> buffer)
+        public  ValueTask<bool> Receive(ITunnelConnection connection, ReadOnlyMemory<byte> buffer)
         {
-           await tuntapTransfer.Write(connection.RemoteMachineId, buffer).ConfigureAwait(false);
+           return  tuntapTransfer.Write(connection.RemoteMachineId, buffer);
         }
 
+       
     }
 
     /// <summary>
@@ -361,17 +363,17 @@ namespace linker.app
 
        private readonly byte[] buffer = new byte[128 * 1024];
         private readonly byte[] bufferWrite = new byte[128 * 1024];
-        public byte[] Read(out int length)
+        public byte[] Read(out uint length)
         {
             length = 0;
             try
             {
                 while (fd > 0 && vpnInput != null)
                 {
-                    length = vpnInput.Read(buffer, 4, buffer.Length - 4);
+                    length = (uint)vpnInput.Read(buffer, 4, buffer.Length - 4);
                     if (length > 0)
                     {
-                        length.ToBytes(buffer.AsSpan());
+                        ((ushort)(length + 2)).ToBytes(buffer.AsSpan());
                         length += 4;
 
                         return buffer;
@@ -431,6 +433,10 @@ namespace linker.app
         public void SetMtu(int value)
         {
         }
+        public void SetMssFix(int value = 0)
+        {
+
+        }
         public void SetNat(out string error)
         {
             error = string.Empty;
@@ -471,9 +477,9 @@ namespace linker.app
         public void RemoveRoute(LinkerTunDeviceRouteItem[] ips)
         {
         }
-        public async Task<bool> CheckAvailable(bool order = false)
+        public  Task<bool> CheckAvailable(bool order = false)
         {
-            return await Task.FromResult(fd > 0);
+            return  Task.FromResult(fd > 0);
         }
 
 

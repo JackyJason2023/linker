@@ -1,0 +1,15 @@
+{
+    "sync.alert": "到选中的客户端，不选择表示所有客户端",
+    "sync.select": "请选择",
+    "sync.SignInSuperKey": "服务器密钥",
+    "sync.SignInSecretKey": "信标密钥",
+    "sync.SignInServer": "信标服务器",
+    "sync.GroupSecretKey": "分组密钥",
+    "sync.RelaySecretKey": "中继密钥",
+    "sync.ReverseSecretKey": "服务器穿透密钥",
+    "sync.UpdaterSecretKey": "更新配置",
+    "sync.TunnelTransports": "隧道协议",
+    "sync.SignInUserId": "用户唯一标识",
+    "sync.ActionStatic": "自定义验证参数",
+    "sync.Firewall": "防火墙选中项"
+}

@@ -77,8 +77,8 @@ namespace linker.messenger.store.file
                 config.Data.Server.SignIn.Anonymous = info.Server.Anonymous;
                 config.Data.Server.SignIn.SuperKey = info.Server.SuperKey;
                 config.Data.Server.SignIn.SuperPassword = info.Server.SuperPassword;
-                //config.Data.Server.SForward.WebPort = info.Server.SForward.WebPort;
-                //config.Data.Server.SForward.TunnelPorts = info.Server.SForward.TunnelPorts;
+                //config.Data.Server.Reverse.WebPort = info.Server.Reverse.WebPort;
+                //config.Data.Server.Reverse.TunnelPorts = info.Server.Reverse.TunnelPorts;
             }
 
             config.Data.Common.Modes = info.Common.Modes;
@@ -309,7 +309,6 @@ namespace linker.messenger.store.file
             {
                 return Convert.ToBase64String(crypto.Encode(new ShareGroupInfo
                 {
-                    Server = config.Data.Client.Server.Host,
                     Id = config.Data.Client.Group.Id,
                     Pwd = config.Data.Client.Group.Password
                 }.ToJson().ToBytes()));
@@ -330,9 +329,13 @@ namespace linker.messenger.store.file
             try
             {
                 ShareGroupInfo info = crypto.Decode(Convert.FromBase64String(param.Content)).GetString().DeJson<ShareGroupInfo>();
-                config.Data.Client.Server.Host = info.Server;
-                config.Data.Client.Group.Id = info.Id;
-                config.Data.Client.Group.Password = info.Pwd;
+                if (config.Data.Client.Groups.Any(c => c.Id == info.Id && c.Password == info.Pwd))
+                {
+                    return false;
+                }
+                var list = config.Data.Client.Groups.ToList();
+                list.Insert(0, new SignInClientGroupInfo { Id = info.Id, Name = info.Id, Password = info.Pwd });
+                config.Data.Client.Groups = list.ToArray();
                 config.Data.Update();
 
                 signInClientTransfer.ReSignIn();
@@ -343,7 +346,7 @@ namespace linker.messenger.store.file
             }
             finally
             {
-                crypto.Dispose(); 
+                crypto.Dispose();
             }
 
             return false;
@@ -403,14 +406,14 @@ namespace linker.messenger.store.file
         public bool Anonymous { get; set; }
         public string SuperKey { get; set; }
         public string SuperPassword { get; set; }
-        public ConfigInstallServerSForwardInfo SForward { get; set; }
+        public ConfigInstallServerReverseInfo Reverse { get; set; }
     }
     public sealed class ConfigInstallServerSignInfo
     {
         public string SuperKey { get; set; }
         public string SuperPassword { get; set; }
     }
-    public sealed class ConfigInstallServerSForwardInfo
+    public sealed class ConfigInstallServerReverseInfo
     {
         public int WebPort { get; set; }
         public string TunnelPorts { get; set; }

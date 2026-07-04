@@ -1,11 +1,11 @@
 <template>
-   <el-dialog class="options-center" :title="$t('server.wlist')" destroy-on-close v-model="state.show" width="40rem" top="2vh">
+   <el-dialog append-to=".app-wrap" class="options-center" :title="$t('wlist')" destroy-on-close v-model="state.show" width="40rem" top="2vh">
         <div>
             <el-form ref="ruleFormRef" :model="state.ruleForm" :rules="state.rules" label-width="auto">
                 <el-form-item label="">
                     <el-row class="w-100">
                         <el-col :span="14">
-                            <el-form-item :label="$t('server.wlistMachineId')" prop="MachineId">
+                            <el-form-item :label="$t('wlist.machineid')" prop="MachineId">
                                 <el-select v-model="state.ruleForm.MachineId" filterable remote :loading="state.loading" :remote-method="handleMachineIds" @change="handleMachineIdChange">
                                     <el-option v-for="(item, index) in state.machineids" :key="index" :label="item.MachineName" :value="item.MachineId">
                                     </el-option>
@@ -14,33 +14,33 @@
                         </el-col>
                         <el-col :span="10">
                             <el-form-item label-width="10">
-                                <el-checkbox v-model="state.apply2user">{{$t('server.wlistUserId')}}</el-checkbox>
+                                <el-checkbox v-model="state.apply2user">{{$t('wlist.userid')}}</el-checkbox>
                             </el-form-item>
                         </el-col>
                     </el-row>
                 </el-form-item>
-                <el-form-item :label="$t('server.wlistName')" prop="Name">
+                <el-form-item :label="$t('wlist.name')" prop="Name">
                     <el-input v-trim v-model="state.ruleForm.Name" />
                 </el-form-item>
-                <el-form-item :label="$t(`server.wlistNodes`)" prop="Nodes">
+                <el-form-item :label="$t(`wlist.nodes`)" prop="Nodes">
                     <el-input type="textarea" :value="state.nodesText" @click="handleShowNodes" readonly resize="none" :rows="4"></el-input>
                 </el-form-item>
-                <el-form-item v-if="state.prefix" :label="$t(`server.wlistNodes${state.ruleForm.Type}`)" prop="Domain">
+                <el-form-item v-if="state.prefix" :label="$t(`wlist.nodes${state.ruleForm.Type}`)" prop="Domain">
                     <el-input v-trim type="textarea" v-model="state.ports" resize="none" :rows="2" @change="handlePortChange"></el-input>
                 </el-form-item>
-                <el-form-item :label="$t('server.wlistRangeTime')" prop="RangeTime">
+                <el-form-item :label="$t('wlist.rangetime')" prop="RangeTime">
                     <el-date-picker
                         v-model="state.timeRange"
                         type="daterange"
                         range-separator="->"
-                        :start-placeholder="$t('server.wlistUseTime')"
-                        :end-placeholder="$t('server.wlistEndTime')"
+                        :start-placeholder="$t('wlist.usetime')"
+                        :end-placeholder="$t('wlist.endtime')"
                     />
                 </el-form-item>
-                <el-form-item :label="$t('server.wlistBandwidth')" prop="Bandwidth">
-                    <el-input-number v-model="state.ruleForm.Bandwidth" width="60" /> Mbps、&lt;0 禁用、0 不限制
+                <el-form-item :label="$t('wlist.bandwidth')" prop="Bandwidth">
+                    <el-input-number v-model="state.ruleForm.Bandwidth" width="60" /> Mbps、&lt;0 、0、&gt;0
                 </el-form-item>
-                <el-form-item :label="$t('server.wlistRemark')" prop="Remark">
+                <el-form-item :label="$t('wlist.remark')" prop="Remark">
                     <el-input v-trim v-model="state.ruleForm.Remark" />
                 </el-form-item>
                 <el-form-item></el-form-item>
@@ -53,14 +53,14 @@
             </el-form>
         </div>
     </el-dialog>
-    <el-dialog class="options-center" :title="$t('server.wlistNodes')" destroy-on-close v-model="state.showNodes" width="54rem" top="2vh">
+    <el-dialog append-to=".app-wrap" class="options-center" :title="$t('wlist.nodes')" destroy-on-close v-model="state.showNodes" width="54rem" top="2vh">
         <div>
             <el-transfer class="src-tranfer"
                 v-model="state.nodeIds"
                 filterable
                 :filter-method="srcFilterMethod"
                 :data="state.nodes"
-                :titles="[$t('server.wlistUnselect'), $t('server.wlistSelected')]"
+                :titles="[$t('wlist.unselect'), $t('wlist.selected')]"
                 :props="{key: 'Id',label: 'Name'}"/>
             <div class="t-c w-100 mgt-1">
                 <el-button @click="state.showNodes = false">{{$t('common.cancel')}}</el-button>
@@ -152,7 +152,7 @@ export default {
             state.showNodes = false;
         }
         const handlePortChange = ()=>{
-            state.nodeIds = [];
+            //state.nodeIds = [];
             formatNodes();        
         }
         const handleMachineIdChange = ()=>{
@@ -182,7 +182,7 @@ export default {
                 json.UseTime = `${moment(state.timeRange[0]).format('YYYY-MM-DD')} 00:00:00`;
                 json.EndTime = `${moment(state.timeRange[1]).format('YYYY-MM-DD')} 23:59:59`;
                 wlistAdd(json).then(()=>{
-                    ElMessage.success(t('common.oper'));
+                    ElMessage.success(t('common.opered'));
                     state.show = false;
                     emit('success');
                 }).catch(()=>{

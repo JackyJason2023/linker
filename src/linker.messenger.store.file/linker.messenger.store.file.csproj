@@ -15,9 +15,9 @@
 		<PackageProjectUrl>https://github.com/snltty/linker</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/snltty/linker</RepositoryUrl>
 		<PackageReleaseNotes>linker messenger store file</PackageReleaseNotes>
-		<Version>1.9.9</Version>
-		<AssemblyVersion>1.9.9</AssemblyVersion>
-		<FileVersion>1.9.9</FileVersion>
+		<Version>2.0.15</Version>
+		<AssemblyVersion>2.0.15</AssemblyVersion>
+		<FileVersion>2.0.15</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -44,7 +44,7 @@
 	  <EmbeddedResource Include="publickey.pem" />
 	</ItemGroup>
 	<ItemGroup>
-		<PackageReference Include="LiteDB" Version="5.0.21"></PackageReference>
+	  <PackageReference Include="LiteDB" Version="5.0.21" />
 	</ItemGroup>
 	<ItemGroup>
 	  <ProjectReference Include="..\linker.libs\linker.libs.csproj" />
@@ -56,9 +56,9 @@
 	  <ProjectReference Include="..\linker.messenger.forward\linker.messenger.forward.csproj" />
 	  <ProjectReference Include="..\linker.messenger.listen\linker.messenger.listen.csproj" />
 	  <ProjectReference Include="..\linker.messenger.logger\linker.messenger.logger.csproj" />
-	  <ProjectReference Include="..\linker.messenger.pcp\linker.messenger.pcp.csproj" />
+	  <ProjectReference Include="..\linker.messenger.mesh\linker.messenger.mesh.csproj" />
 	  <ProjectReference Include="..\linker.messenger.relay\linker.messenger.relay.csproj" />
-	  <ProjectReference Include="..\linker.messenger.sforward\linker.messenger.sforward.csproj" />
+	  <ProjectReference Include="..\linker.messenger.reverse\linker.messenger.reverse.csproj" />
 	  <ProjectReference Include="..\linker.messenger.signin\linker.messenger.signin.csproj" />
 	  <ProjectReference Include="..\linker.messenger.socks5\linker.messenger.socks5.csproj" />
 	  <ProjectReference Include="..\linker.messenger.tunnel\linker.messenger.tunnel.csproj" />

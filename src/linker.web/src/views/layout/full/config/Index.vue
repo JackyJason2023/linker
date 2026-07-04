@@ -6,7 +6,7 @@
     </div>
 </template>
 <script>
-import Config from './Config.vue';
+import Config from '../../../components/config/Config.vue';
 export default {
     components:{Config},
     setup(props) {
@@ -16,7 +16,6 @@ export default {
 </script>
 <style lang="stylus" scoped>
 .servers-wrap{
-    padding:1rem
     font-size:1.3rem;
     color:#555;
     box-sizing:border-box;

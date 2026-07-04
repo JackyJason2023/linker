@@ -16,9 +16,9 @@
 		<PackageProjectUrl>https://github.com/snltty/linker</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/snltty/linker</RepositoryUrl>
 		<PackageReleaseNotes>linker tunnel</PackageReleaseNotes>
-		<Version>1.9.9</Version>
-		<AssemblyVersion>1.9.9</AssemblyVersion>
-		<FileVersion>1.9.9</FileVersion>
+		<Version>2.0.15</Version>
+		<AssemblyVersion>2.0.15</AssemblyVersion>
+		<FileVersion>2.0.15</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -37,12 +37,14 @@
 		<DebugType>embedded</DebugType>
 	</PropertyGroup>
 	<ItemGroup>
-	  <PackageReference Include="Mono.Nat" Version="3.0.4" />
-	  <PackageReference Include="System.IO.Pipelines" Version="9.0.3" />
+	  <PackageReference Include="System.IO.Pipelines" Version="8.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\linker.fec\linker.fec.csproj" />
+		<ProjectReference Include="..\linker.kcp\linker.kcp.csproj" />
 		<ProjectReference Include="..\linker.libs\linker.libs.csproj" />
+		<ProjectReference Include="..\linker.upnp\linker.upnp.csproj" />
 	</ItemGroup>
 
 </Project>

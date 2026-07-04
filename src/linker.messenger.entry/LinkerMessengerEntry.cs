@@ -1,14 +1,11 @@
 ﻿using linker.messenger.api;
 using linker.messenger.decenter;
-using linker.messenger.exroute;
 using linker.messenger.flow;
 using linker.messenger.forward;
 using linker.messenger.listen;
 using linker.messenger.logger;
 using Microsoft.Extensions.DependencyInjection;
-using linker.messenger.pcp;
 using linker.messenger.relay;
-using linker.messenger.sforward;
 using linker.messenger.signin;
 using linker.messenger.socks5;
 using linker.messenger.sync;
@@ -24,6 +21,9 @@ using linker.messenger.firewall;
 using linker.messenger.wakeup;
 using linker.messenger.wlist;
 using linker.messenger.channel;
+using linker.messenger.rpolicy;
+using linker.messenger.reverse;
+using linker.messenger.mesh;
 
 namespace linker.messenger.entry
 {
@@ -52,7 +52,7 @@ namespace linker.messenger.entry
                 //api接口和web
                 .AddApiClient()
                 //路由排除
-                .AddExRoute()
+                .AddRouteExclusionPolicy()
 
                 //服务器监听
                 .AddListen()
@@ -65,13 +65,13 @@ namespace linker.messenger.entry
                 .AddDecenterClient().AddDecenterServer()
                 //端口转发
                 .AddForwardClient().AddForwardServer()
-                //pcp
-                .AddPcpClient().AddPcpServer()
+                //mesh
+                .AddMeshClient().AddMeshServer()
                 //中继
                 .AddRelayClient().AddRelayServer()
 
                 //服务器穿透
-                .AddSForwardClient().AddSForwardServer()
+                .AddReverseClient().AddReverseServer()
                 //登录
                 .AddSignInClient().AddSignInServer()
                 //socks5
@@ -178,8 +178,8 @@ namespace linker.messenger.entry
                     serviceProvider.UseActionServer();
                 if ((modules & ExcludeModule.Forward) != ExcludeModule.Forward)
                     serviceProvider.UseForwardServer();
-                if ((modules & ExcludeModule.SForward) != ExcludeModule.SForward)
-                    serviceProvider.UseSForwardServer();
+                if ((modules & ExcludeModule.Reverse) != ExcludeModule.Reverse)
+                    serviceProvider.UseReverseServer();
                 if ((modules & ExcludeModule.Socks5) != ExcludeModule.Socks5)
                     serviceProvider.UseSocks5Server();
                 if ((modules & ExcludeModule.Tuntap) != ExcludeModule.Tuntap)
@@ -189,7 +189,7 @@ namespace linker.messenger.entry
                 if ((modules & ExcludeModule.Wakeup) != ExcludeModule.Wakeup)
                     serviceProvider.UseWakeupServer();
 
-                serviceProvider.UseAccessServer().UseDecenterServer().UsePcpServer()
+                serviceProvider.UseAccessServer().UseDecenterServer().UseMeshServer()
                     .UseRelayServer().UseWhiteListServer()
                  .UseSignInServer().UseSyncServer().UseTunnelServer().UseFlowServer();
 
@@ -210,8 +210,8 @@ namespace linker.messenger.entry
                     serviceProvider.UseActionClient();
                 if ((modules & ExcludeModule.Forward) != ExcludeModule.Forward)
                     serviceProvider.UseForwardClient();
-                if ((modules & ExcludeModule.SForward) != ExcludeModule.SForward)
-                    serviceProvider.UseSForwardClient();
+                if ((modules & ExcludeModule.Reverse) != ExcludeModule.Reverse)
+                    serviceProvider.UseReverseClient();
                 if ((modules & ExcludeModule.Socks5) != ExcludeModule.Socks5)
                     serviceProvider.UseSocks5Client();
                 if ((modules & ExcludeModule.Tuntap) != ExcludeModule.Tuntap)
@@ -222,7 +222,7 @@ namespace linker.messenger.entry
                     serviceProvider.UseWakeupClient();
 
 
-                serviceProvider.UseExRoute().UseAccessClient().UseDecenterClient().UsePcpClient()
+                serviceProvider.UseRouteExclusionPolicy().UseAccessClient().UseDecenterClient().UseMeshClient()
                     .UseRelayClient().UseWhiteListClient()
                     .UseSyncClient().UseTunnelClient().UseFlowClient();
 
@@ -253,7 +253,7 @@ namespace linker.messenger.entry
         /// <summary>
         /// 内网穿透
         /// </summary>
-        SForward = 2,
+        Reverse = 2,
         /// <summary>
         /// socks5
         /// </summary>

@@ -22,14 +22,18 @@ namespace linker.messenger.firewall
             this.counterDecenter = counterDecenter;
             signInClientState.OnSignInSuccess += Reset;
         }
-        private void Reset(int times)
+        private Task Reset(int times)
         {
-            BuildRules();
+            return Task.Run(() =>
+            {
+                BuildRules();
+            });
         }
         private void BuildRules()
         {
             linkerFirewall.BuildRules(firewallClientStore.GetEnabled(signInClientStore.Group.Id).Select(c => (LinkerFirewallRuleInfo)c).ToList());
             linkerFirewall.SetState(firewallClientStore.State);
+            counterDecenter.SetValue("firewall", Count);
         }
 
         public bool State(LinkerFirewallState state)

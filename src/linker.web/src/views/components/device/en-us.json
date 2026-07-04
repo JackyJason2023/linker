@@ -1,0 +1,7 @@
+{
+    "device":"Device",
+    "device.title": "Settings for {0}",
+    "device.restart": "Please restart the client after",
+    "device.name": "Device Name",
+    "device.avatar": "Avatar"
+}

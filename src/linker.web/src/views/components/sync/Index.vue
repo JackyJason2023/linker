@@ -1,14 +1,14 @@
 <template>
     <AccessBoolean value="Sync">
         <template #default="{values}">
-            <div>
+            <div class="flex flex-center">
                 <slot>
-                    <el-button class="btn" size="small" @click="handleShowSync(values)"><el-icon><Share /></el-icon></el-button>
+                    <a class="a-line" href="javascript:;" @click="handleShowSync(values)"><el-icon><Share /></el-icon></a>
                 </slot>
-                <el-dialog class="options-center" :title="$t('server.sync')" destroy-on-close v-model="state.showNames" width="54rem" top="2vh">
+                <el-dialog append-to=".app-wrap" class="options-center" :title="$t('common.sync')" destroy-on-close v-model="state.showNames" width="54rem" top="2vh">
                     <div>
                         <div class="t-c">
-                            {{ `${$t('server.sync')}【${$t(`server.async${state.name}`)}】${$t('server.asyncText')}` }}
+                            {{ `${$t('common.sync')}【${$t(`async.${state.name}`)}】${$t('sync.alert')}` }}
                         </div>
                         <el-transfer class="src-tranfer mgt-1"
                             v-model="state.srcIdValues"
@@ -59,7 +59,7 @@ export default {
                 names:[props.name],
                 ids:state.srcIdValues
             }).then(res => {
-                ElMessage.success(t('common.oper'));
+                ElMessage.success(t('common.opered'));
                 state.showNames = false;
             });
         }
@@ -94,5 +94,6 @@ export default {
 .el-transfer.src-tranfer .el-transfer__buttons .el-button{display:block;}
 .el-transfer.src-tranfer .el-transfer__buttons .el-button:nth-child(2){margin:1rem 0 0 0;}
 </style>
+
 <style lang="stylus" scoped>
 </style>

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -42,17 +43,6 @@ namespace linker.libs
 
     public static partial class NetworkHelper
     {
-        public static IPEndPoint TransEndpointFamily(IPEndPoint ep)
-        {
-            if (ep.Address.AddressFamily == AddressFamily.InterNetworkV6 && ep.Address.IsIPv4MappedToIPv6)
-            {
-                Span<byte> bytes = stackalloc byte[16];
-                ep.Address.TryWriteBytes(bytes, out _);
-                return new IPEndPoint(new IPAddress(bytes[^4..]), ep.Port);
-            }
-            return ep;
-        }
-
         public static ushort ApplyNewPort()
         {
             using Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
@@ -65,7 +55,7 @@ namespace linker.libs
             return port;
         }
 
-        public static IPAddress GetDomainIp(string domain)
+        public static IPAddress GetDomainIp(string domain, AddressFamily addressFamily = AddressFamily.Unspecified)
         {
             try
             {
@@ -77,14 +67,14 @@ namespace linker.libs
                 {
                     return ip;
                 }
-                return Dns.GetHostEntry(domain).AddressList.FirstOrDefault();
+                return Dns.GetHostEntry(domain, addressFamily).AddressList.FirstOrDefault();
             }
             catch (Exception)
             {
             }
             return null;
         }
-        public static async Task<IPAddress> GetDomainIpAsync(string domain)
+        public static async Task<IPAddress> GetDomainIpAsync(string domain, AddressFamily addressFamily = AddressFamily.Unspecified)
         {
             try
             {
@@ -96,24 +86,26 @@ namespace linker.libs
                 {
                     return ip;
                 }
-                return (await Dns.GetHostEntryAsync(domain).ConfigureAwait(false)).AddressList.FirstOrDefault();
+                return (await Dns.GetHostEntryAsync(domain, addressFamily).ConfigureAwait(false)).AddressList.FirstOrDefault();
             }
             catch (Exception)
             {
             }
             return null;
         }
-        public static IPEndPoint GetEndPoint(string host, int defaultPort)
+        public static IPEndPoint GetEndPoint(string host, int defaultPort, AddressFamily addressFamily = AddressFamily.Unspecified)
         {
             try
             {
                 string[] hostArr = host.Split(':');
                 int port = defaultPort;
+                string domain = hostArr[0];
                 if (hostArr.Length == 2)
                 {
                     port = int.Parse(hostArr[1]);
+                    domain = string.Join(":", hostArr.Take(hostArr.Length - 1));
                 }
-                IPAddress ip = GetDomainIp(hostArr[0]);
+                IPAddress ip = GetDomainIp(domain, addressFamily);
                 return new IPEndPoint(ip, port);
             }
             catch (Exception)
@@ -121,7 +113,7 @@ namespace linker.libs
             }
             return null;
         }
-        public static async Task<IPEndPoint> GetEndPointAsync(string host, int defaultPort)
+        public static async Task<IPEndPoint> GetEndPointAsync(string host, int defaultPort, AddressFamily addressFamily = AddressFamily.Unspecified)
         {
             try
             {
@@ -133,7 +125,7 @@ namespace linker.libs
                     port = int.Parse(hostArr[^1]);
                     domain = string.Join(":", hostArr.Take(hostArr.Length - 1));
                 }
-                IPAddress ip = await GetDomainIpAsync(domain).ConfigureAwait(false);
+                IPAddress ip = await GetDomainIpAsync(domain, addressFamily).ConfigureAwait(false);
                 return new IPEndPoint(ip, port);
             }
             catch (Exception)
@@ -142,10 +134,9 @@ namespace linker.libs
             return null;
         }
 
-        private readonly static List<string> starts = ["10.", "100.", "192.168.", "172."];
-        public static ushort GetRouteLevel(string server, out List<IPAddress> result)
+        public static async Task<(ushort, List<IPAddress>)> GetRouteLevel(string server)
         {
-            result = new List<IPAddress>();
+            List<IPAddress> result = new List<IPAddress>();
             if (string.IsNullOrWhiteSpace(server) == false)
             {
                 server = server.Split(':')[0];
@@ -153,17 +144,17 @@ namespace linker.libs
 
             if (OperatingSystem.IsWindows())
             {
-                return GetRouteLevelWindows(server, out result);
+                return await GetRouteLevelWindows(server).ConfigureAwait(false);
             }
             else if (OperatingSystem.IsLinux())
             {
-                return GetRouteLevelLinux(server, out result);
+                return GetRouteLevelLinux(server);
             }
-            return 3;
+            return (3, result);
         }
-        private static ushort GetRouteLevelLinux(string server, out List<IPAddress> result)
+        private static (ushort, List<IPAddress>) GetRouteLevelLinux(string server)
         {
-            result = new List<IPAddress>();
+            List<IPAddress> result = new List<IPAddress>();
 
             string str = CommandHelper.Linux(string.Empty, new string[] { $"traceroute {server} -4 -m 5 -w 1" });
             string[] lines = str.Split(Environment.NewLine);
@@ -171,25 +162,31 @@ namespace linker.libs
             Regex regex = MyRegex();
             for (ushort i = 1; i < lines.Length; i++)
             {
-                string ip = regex.Match(lines[i]).Groups[1].Value;
-                if (starts.Any(c => ip.ToString().StartsWith(c)))
+                try
                 {
-                    result.Add(IPAddress.Parse(ip));
+                    string ip = regex.Match(lines[i]).Groups[1].Value;
+                    if (IPAddress.TryParse(ip, out IPAddress _ip) && _ip.IsPrivateIP())
+                    {
+                        result.Add(_ip);
+                    }
+                    else
+                    {
+                        return (i, result);
+                    }
                 }
-                else
+                catch (Exception)
                 {
-                    return i;
                 }
             }
 
-            return 3;
+            return (3, result);
         }
-        private static ushort GetRouteLevelWindows(string server, out List<IPAddress> result)
+        private static async Task<(ushort, List<IPAddress>)> GetRouteLevelWindows(string server)
         {
-            result = new List<IPAddress>();
+            List<IPAddress> result = new List<IPAddress>();
             try
             {
-                IPAddress target = Dns.GetHostEntry(server).AddressList.FirstOrDefault(c => c.AddressFamily == AddressFamily.InterNetwork);
+                IPAddress target = (await Dns.GetHostEntryAsync(server).ConfigureAwait(false)).AddressList.FirstOrDefault(c => c.AddressFamily == AddressFamily.InterNetwork);
 
                 for (ushort i = 1; i <= 5; i++)
                 {
@@ -200,25 +197,24 @@ namespace linker.libs
                         continue;
                     }
 
-                    if (starts.Any(c => reply.Address.ToString().StartsWith(c)))
+                    if (reply.Address.IsPrivateIP())
                     {
                         result.Add(reply.Address);
                     }
                     else
                     {
-                        return i;
+                        return (i, result);
                     }
                 }
             }
             catch (Exception)
             {
             }
-            return 3;
+            return (3, result);
         }
 
 
         private readonly static byte[] ipv6LocalBytes = [254, 128, 0, 0, 0, 0, 0, 0];
-
         private static IPAddress[] GetIP()
         {
             if (OperatingSystem.IsAndroid() == false)
@@ -271,23 +267,71 @@ namespace linker.libs
                 .Distinct().ToArray();
         }
 
+        /// <summary>
+        /// 找到合适的子网CIDR
+        /// </summary>
+        /// <param name="mainPrefixLength"></param>
+        /// <param name="start"></param>
+        /// <param name="end"></param>
+        /// <returns></returns>
+        public static (IPAddress network, byte prefixLength) FindSubNetworkCidr(byte mainPrefixLength, IPAddress start, IPAddress end)
+        {
+            //主网络掩码
+            uint mainPrefixValue = ToPrefixValue(mainPrefixLength);
+
+            //按范围找到最接近的子网段
+            uint startIpValue = ToValue(start);
+            uint endIpValue = ToValue(end);
+
+            //开始
+            uint originStart = startIpValue & ~mainPrefixValue;
+            //结束
+            uint originEnd = endIpValue & ~mainPrefixValue;
+
+            //掩码
+            byte prefixLength = (byte)(32 - (int)Math.Log2(FindNearestPowerOfTwo(originEnd - originStart + 1)));
+
+            //最靠近的网络号
+            uint startValue = FindNearestMultiple(originStart, prefixLength);
+
+            //网络号 192.168.0.64
+            uint networkValue = (startIpValue & mainPrefixValue) | startValue;
+
+            return (ToIP(networkValue), prefixLength);
+        }
+        public static uint FindNearestMultiple(uint originStart, byte prefixLength)
+        {
+            uint ratio = (uint)(1 << (32 - prefixLength));
+
+            uint lower = (originStart / ratio) * ratio;
+            uint upper = lower + ratio;
+
+            return originStart - lower <= upper - originStart ? lower : upper;
+        }
+        private static uint FindNearestPowerOfTwo(uint number)
+        {
+            if (number <= 1)
+            {
+                return 1;
+            }
+            // 31 - 左边1之前的全0个数 = 最后一个1的位置
+            // 66 01100000 -> 6  1<<6=64 和 1<<7=128
+            int highestBit = 31 - BitOperations.LeadingZeroCount(number);
+
+            uint lower = 1U << highestBit;
+            uint upper = 1U << (highestBit + 1);
+
+            return (number - lower <= upper - number) ? lower : upper;
+        }
+
+
         public static byte ToPrefixLength(uint ip)
         {
-            int maskLength = 32, i;
-            for (i = 0; i < sizeof(uint) * 8; i++)
-            {
-                if (((ip >> i) & 0x01) != 0)
-                {
-                    break;
-                }
-            }
-            return (byte)(maskLength - i);
+            return (byte)BitOperations.PopCount(ip);
         }
         public static uint ToPrefixValue(byte prefixLength)
         {
-            //最多<<31 所以0需要单独计算
-            if (prefixLength < 1) return 0;
-            return 0xffffffff << (32 - prefixLength);
+            return prefixLength == 0 ? 0 : 0xffffffff << (32 - prefixLength);
         }
 
         public static uint ToValue(IPAddress ip)

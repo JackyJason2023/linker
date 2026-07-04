@@ -1,15 +1,15 @@
 <template>
-  <el-dialog class="options-center" :title="$t('status.group')" destroy-on-close v-model="state.show" width="77rem" top="2vh">
+  <el-dialog append-to=".app-wrap" class="options-center" :title="$t('group')" destroy-on-close v-model="state.show" width="77rem" top="2vh">
     <div class="group-wrap">
     <el-table stripe  :data="state.list" border size="small" width="100%" height="70vh" @cell-dblclick="handleCellClick">
-        <el-table-column prop="Name" :label="$t('status.groupName')" width="100">
+        <el-table-column prop="Name" :label="$t('group.name')" width="100">
             <template #default="scope">
                 <template v-if="scope.row.NameEditing">
                     <el-input v-trim autofocus size="small" v-model="scope.row.Name"
                         @blur="handleEditBlur(scope.row, 'Name')"></el-input>
                 </template>
                 <template v-else>
-                    <a  href="javascript:;" class="a-line" @click="handleEdit(scope.row, 'Name')">{{ scope.row.Name || '未知' }}</a>
+                    <a  href="javascript:;" class="a-line" @click="handleEdit(scope.row, 'Name')">{{ scope.row.Name || $t('common.unknow') }}</a>
                 </template>
             </template>
         </el-table-column>
@@ -24,7 +24,7 @@
                 </template>
             </template>
         </el-table-column>
-        <el-table-column prop="Password" :label="$t('status.groupPassword')" >
+        <el-table-column prop="Password" :label="$t('group.psswd')" >
             <template #default="scope">
                 <template v-if="scope.row.PasswordEditing">
                     <el-input v-trim type="password" show-password size="small" v-model="scope.row.Password" @blur="handleEditBlur(scope.row, 'Password')"></el-input>
@@ -36,15 +36,15 @@
                 </template>
             </template>
         </el-table-column>
-        <el-table-column prop="Oper" :label="$t('status.groupOper')" width="110" fixed="right">
+        <el-table-column prop="Oper" :label="$t('common.oper')" width="110" fixed="right">
             <template #header>
                 <div class="flex">
-                    <strong>{{ $t('status.groupOper') }}</strong><span class="flex-1"></span><Sync name="GroupSecretKey"></Sync>
+                    <strong>{{ $t('common.oper') }}</strong><span class="flex-1"></span><Sync name="GroupSecretKey"></Sync>
                 </div>
             </template>
             <template #default="scope">
                 <div>
-                    <el-popconfirm :title="$t('status.groupDelConfirm')" @confirm="handleDel(scope.$index)">
+                    <el-popconfirm :title="$t('common.delSure',[''])" @confirm="handleDel(scope.$index)">
                         <template #reference>
                             <el-button type="danger" size="small">
                                 <el-icon><Delete /></el-icon>
@@ -122,7 +122,7 @@ export default {
         }
         const handleAdd = (index)=>{
             if(state.list.filter(c=>c.Id == '' || c.Name == '').length > 0){
-                ElMessage.error(t('status.groupValidate'));
+                ElMessage.error(t('group.validate'));
                 return;
             }
             state.list.splice(index+1,0,{Name:'',Id:'',Password:''});
@@ -137,7 +137,7 @@ export default {
                 name:globalData.value.config.Client.Name.trim(),
                 groups:arr
             }).then(() => {
-                ElMessage.success(t('common.oper'));
+                ElMessage.success(t('common.opered'));
                 setTimeout(()=>{
                     window.location.reload();
                 },1000);
@@ -149,7 +149,7 @@ export default {
 
         const handleSave = ()=>{
             setSignInGroups(state.list).then(()=>{
-                ElMessage.success(t('common.oper'));
+                ElMessage.success(t('common.opered'));
             }).catch((err)=>{
                 console.log(err);
                 ElMessage.error(t('common.operFail'));

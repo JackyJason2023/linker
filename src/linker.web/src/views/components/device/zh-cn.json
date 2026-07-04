@@ -1,0 +1,7 @@
+{
+    "device":"设备",
+    "device.title":"{0}的设置",
+    "device.restart":"修改后最好能重启一次客户端",
+    "device.name":"设备名",
+    "device.avatar":"头像"
+}

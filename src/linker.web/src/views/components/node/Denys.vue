@@ -6,11 +6,11 @@
             <el-button  type="success" size="small" @click="handleAdd"><el-icon><Plus /></el-icon></el-button>
         </div>
         <el-table :data="state.request.List" stripe border size="small" width="100%">
-            <el-table-column prop="Str" :label="$t('server.denyStr')"></el-table-column>
-            <el-table-column prop="Remark" :label="$t('server.denyRemark')"></el-table-column>
-            <el-table-column prop="Oper" :label="$t('server.denyOper')" width="60">
+            <el-table-column prop="Str" :label="$t('deny.str')"></el-table-column>
+            <el-table-column prop="Remark" :label="$t('deny.remark')"></el-table-column>
+            <el-table-column prop="Oper" :label="$t('common.oper')" width="60">
                 <template #default="scope">
-                    <el-popconfirm :confirm-button-text="$t('common.confirm')" :cancel-button-text="$t('common.cancel')" :title="$t('server.denyDel')"
+                    <el-popconfirm :confirm-button-text="$t('common.confirm')" :cancel-button-text="$t('common.cancel')" :title="$t('common.delSure',[''])"
                         @confirm="handleDel(scope.row)">
                         <template #reference>
                             <el-button type="danger" size="small"><el-icon><Delete /></el-icon></el-button>
@@ -31,7 +31,7 @@
 
 <script>
 import {  relayDenys, relayDenysDel} from '@/apis/relay';
-import { sforwardDenys, sforwardDenysDel } from '@/apis/sforward';
+import { reverseDenys, reverseDenysDel } from '@/apis/reverse';
 import { onActivated, onMounted, reactive } from 'vue';
 import { Delete,Plus,Search } from '@element-plus/icons-vue';
 import Add from './Add.vue';
@@ -40,8 +40,8 @@ export default {
     components:{Delete,Add,Plus,Search},
     setup (props,{emit}) {
 
-        const getDataFn = props.type == 'relay' ? relayDenys : sforwardDenys;
-        const delFn = props.type == 'relay' ? relayDenysDel : sforwardDenysDel;
+        const getDataFn = props.type == 'relay' ? relayDenys : reverseDenys;
+        const delFn = props.type == 'relay' ? relayDenysDel : reverseDenysDel;
         const state = reactive({
             request:{
                 NodeId:props.data.NodeId,

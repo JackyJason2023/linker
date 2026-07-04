@@ -1,10 +1,10 @@
 <template>
-    <el-dialog class="options-center" :title="$t('server.wlist')" destroy-on-close v-model="state.show" width="77rem" top="2vh">
+    <el-dialog append-to=".app-wrap" class="options-center" :title="$t('wlist')" destroy-on-close v-model="state.show" width="77rem" top="2vh">
     <div class="group-wrap">
-        <div class="head">
+        <div class="head mgb-1">
             <div class="search flex">
-                <div><span>{{$t('server.wlistName')}}</span> <el-input v-trim v-model="state.page.Name" style="width:8rem" size="small" clearable @change="handleSearch" /></div>
-                <div><span>{{$t('server.wlistRemark')}}</span> <el-input v-trim v-model="state.page.Remark" style="width:8rem" size="small" clearable @change="handleSearch" /></div>
+                <div><span>{{$t('wlist.name')}}</span> <el-input v-trim v-model="state.page.Name" class="w-8" size="small" clearable @change="handleSearch" /></div>
+                <div><span>{{$t('wlist.remark')}}</span> <el-input v-trim v-model="state.page.Remark" class="w-8" size="small" clearable @change="handleSearch" /></div>
                 <div>
                     <el-button size="small" @click="handleSearch()">
                         <el-icon><Search /></el-icon>
@@ -19,28 +19,28 @@
         </div>
         <el-table stripe :data="state.list.List" border size="small" width="100%">
             
-            <el-table-column prop="Name" :label="$t('server.wlistName')"></el-table-column>
-            <el-table-column prop="Nodes" :label="$t(`server.wlistNodes`)">
+            <el-table-column prop="Name" :label="$t('wlist.name')"></el-table-column>
+            <el-table-column prop="Nodes" :label="$t(`wlist.nodes`)">
                 <template #default="scope">
                     <span>{{ scope.row.Nodes.filter(c=>c.indexOf(state.prefix)<0).map(c=>state.nodes[c]).join(',') }}</span>
                 </template>
             </el-table-column>
-            <el-table-column v-if="state.prefix" prop="Nodes1" :label="$t(`server.wlistNodes${state.page.Type}`)">
+            <el-table-column v-if="state.prefix" prop="Nodes1" :label="$t(`wlist.nodes${state.page.Type}`)">
                 <template #default="scope">
                     <span>{{ scope.row.Nodes.filter(c=>c.indexOf(state.prefix)>=0).map(c=>c.replace(state.prefix,'')).join(',') }}</span>
                 </template>
             </el-table-column>
             <el-table-column prop="Bandwidth" label="Mbps" width="80"></el-table-column>
-            <el-table-column prop="Remark" :label="$t('server.wlistRemark')"></el-table-column>
-            <el-table-column prop="UseTime" :label="`${$t('server.wlistUseTime')}`" width="140"></el-table-column>
-            <el-table-column prop="EndTime" :label="`${$t('server.wlistEndTime')}`" width="140"></el-table-column>
-            <el-table-column prop="AddTime" :label="`${$t('server.wlistAddTime')}`" width="140"></el-table-column>
-            <el-table-column fixed="right" prop="Oper" :label="$t('server.wlistOper')" width="110">
+            <el-table-column prop="Remark" :label="$t('wlist.remark')"></el-table-column>
+            <el-table-column prop="UseTime" :label="`${$t('wlist.usetime')}`" width="140"></el-table-column>
+            <el-table-column prop="EndTime" :label="`${$t('wlist.endtime')}`" width="140"></el-table-column>
+            <el-table-column prop="AddTime" :label="`${$t('wlist.addtime')}`" width="140"></el-table-column>
+            <el-table-column fixed="right" prop="Oper" :label="$t('common.oper')" width="110">
                 <template #default="scope">
                     <el-button size="small" @click="handleEdit(scope.row)">
                         <el-icon><EditPen /></el-icon>
                     </el-button>
-                    <el-popconfirm :title="$t('server.wlistDelConfirm')" @confirm="handleDel(scope.row)">
+                    <el-popconfirm :title="$t('common.delSure',[''])" @confirm="handleDel(scope.row)">
                         <template #reference>
                             <el-button type="danger" size="small">
                                 <el-icon><Delete /></el-icon>

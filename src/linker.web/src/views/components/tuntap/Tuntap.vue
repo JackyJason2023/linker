@@ -1,7 +1,15 @@
 <template>
-    <el-table-column prop="tuntap" :label="$t('home.tuntap')" width="160">
+    <el-table-column prop="tuntap" :label="$t('tuntap')" width="170">
         <template #header>
-           <a href="javascript:;" class="a-line" @click="handleShowLease">{{$t('home.tuntap')}}</a>
+            <div class="flex">
+                <a href="javascript:;" class="a-line" @click="handleShowLease">{{$t('tuntap')}}</a>
+                <span class="w-1"></span>
+                <el-select size="small" class="flex-1 transparent" v-model="tuntap.network" @change="handleChange">
+                    <template v-for="item in tuntap.networks">
+                        <el-option :value="item.value" :label="item.label"></el-option>
+                    </template>
+                </el-select>
+            </div>
         </template>
         <template #default="scope">
             <div v-if="scope.row ">
@@ -12,11 +20,11 @@
                 </template>
                 <template v-else-if="!scope.row.hook_tuntap_load">
                     <div class="skeleton-animation">
-                        <el-skeleton animated>
+                        <el-skeleton animated style="line-height: 1.8rem;">
                             <template #template>
-                                <el-skeleton-item variant="text" style="width: 60%;" />
-                                <el-skeleton-item variant="text" style="width: 20%;margin-left:20%" />
-                                <el-skeleton-item variant="text" style="width: 70%" />
+                                <el-skeleton-item variant="text" class="w-60-" />
+                                <el-skeleton-item variant="text" class="w-20- mgl-20-"/>
+                                <el-skeleton-item variant="text" class="w-70-"/>
                             </template>
                         </el-skeleton>
                     </div>
@@ -38,9 +46,13 @@ export default {
         const handleShowLease = ()=>{
             tuntap.value.showLease = true;
         }
+        const handleChange = (val)=>{
+            tuntap.value.network = val;
+            emit('refresh')
+        }
        
         return {
-            tuntap,handleShowLease
+            tuntap,handleShowLease,handleChange
         }
     }
 }

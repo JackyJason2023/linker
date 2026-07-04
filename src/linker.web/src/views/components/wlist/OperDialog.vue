@@ -1,27 +1,30 @@
 <template>
-    <el-dialog v-model="state.show" append-to=".app-wrap" :title="state.title" top="1vh" width="400">
+    <el-dialog append-to=".app-wrap" v-model="state.show" :title="state.title" top="1vh" width="400">
         <div>
             <el-descriptions border size="small" :column="1" label-width="8rem" overlength-control="wrap">
-                <el-descriptions-item label="名称">{{ state.status.Info.Name }}</el-descriptions-item>
-                <el-descriptions-item label="带宽">
+                <el-descriptions-item :label="$t('wlist.name')">{{ state.status.Info.Name }}</el-descriptions-item>
+                <el-descriptions-item :label="$t('wlist.bandwidth')">
                     <div>
-                        <span v-if="state.status.Info.Bandwidth < 0">禁止</span>
-                        <span v-if="state.status.Info.Bandwidth == 0">无限制</span>
+                        <span v-if="state.status.Info.Bandwidth < 0">{{$t('wlist.deny',[''])}}</span>
+                        <span v-if="state.status.Info.Bandwidth == 0">{{$t('wlist.allow')}}</span>
                         <span v-else-if="state.status.Info.Bandwidth>0">{{state.status.Info.Bandwidth}}Mbps</span>
                     </div>
                 </el-descriptions-item>
-                <el-descriptions-item label="开始时间">{{ state.status.Info.UseTime }}</el-descriptions-item>
-                <el-descriptions-item label="结束时间">{{ state.status.Info.EndTime }}</el-descriptions-item>
-                <el-descriptions-item label="作用于">
-                    <span v-if="state.status.Info.UserId">同用户id客户端</span>
-                    <span v-else-if="state.status.Info.MachineId">本客户端</span>
+                <el-descriptions-item :label="$t('wlist.usetime')">{{ state.status.Info.UseTime }}</el-descriptions-item>
+                <el-descriptions-item :label="$t('wlist.endtime')">{{ state.status.Info.EndTime }}</el-descriptions-item>
+                <el-descriptions-item :label="$t('wlist.target')">
+                    <span v-if="state.status.Info.UserId">{{$t('wlist.userid')}}</span>
+                    <span v-else-if="state.status.Info.MachineId">{{$t('wlist.machineid')}}</span>
                 </el-descriptions-item>
-                <el-descriptions-item label="备注">{{ state.status.Info.Remark }}</el-descriptions-item>
+                <el-descriptions-item :label="$t('wlist.remark')">{{ state.status.Info.Remark }}</el-descriptions-item>
                
-                 <el-descriptions-item label="操作">
+                 <el-descriptions-item :label="$t('common.oper')">
                     <div v-if="state.super">
                         <template v-if="state.status.Info.Id > 0">
-                            <el-popconfirm confirm-button-text="确认" cancel-button-text="取消" title="确定删除?" @confirm="handleDel">
+                            <el-popconfirm 
+                            :confirm-button-text="$t('common.confirm')"
+                            :cancel-button-text="$t('common.cancel')" 
+                            :title="$t('common.delSure',[''])" @confirm="handleDel">
                                 <template #reference>
                                     <el-button type="danger" size="small" :loading="state.loading"><el-icon> <Delete /></el-icon></el-button>
                                 </template>
@@ -44,18 +47,21 @@ import { wlistDel, wlistStatus } from '@/apis/wlist';
 import { Delete, Plus } from '@element-plus/icons-vue';
 import { injectGlobalData } from '@/provide';
 import Add from './Add.vue';
+import { useI18n } from 'vue-i18n';
 export default {
     props: ['modelValue'],
     emits: ['update:modelValue'],
     components: {Delete, Plus,Add },
     setup(props, { emit }) {
+
+        const {t} = useI18n();
         const wlist = useWlist();
         const globalData = injectGlobalData();
         
         const state = reactive({
             show: true,
             machineId: wlist.value.device.id,
-            title: `[${wlist.value.device.name}]上的${wlist.value.device.typeText}白名单`,
+            title:t('wlist.title',[wlist.value.device.name,wlist.value.device.typeText]),
             status: {
                 Enabled:false,
                 Type:'',

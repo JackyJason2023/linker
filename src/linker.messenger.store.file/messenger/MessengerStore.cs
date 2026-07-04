@@ -8,10 +8,12 @@ namespace linker.messenger.store.file.messenger
     public class MessengerStore : IMessengerStore
     {
         public X509Certificate Certificate => certificate;
+        public X509Certificate CertificateExport => certificateExport;
 
         private readonly FileConfig fileConfig;
 
         private X509Certificate2 certificate;
+        private X509Certificate2 certificateExport;
         public MessengerStore(FileConfig fileConfig)
         {
             this.fileConfig = fileConfig;
@@ -28,14 +30,15 @@ namespace linker.messenger.store.file.messenger
             using X509Certificate2 publicCert = X509Certificate2.CreateFromPem(readerPublic.ReadToEnd());
             certificate = publicCert.CopyWithPrivateKey(rsaPrivateKey);
 
+            //不导出不支持windows什么的
+            byte[] pfxBytes = certificate.Export(X509ContentType.Pfx, Helper.GlobalString);
+            certificateExport = new X509Certificate2(pfxBytes, Helper.GlobalString, X509KeyStorageFlags.Exportable);
+
             if (OperatingSystem.IsAndroid() == false)
             {
-                //不导出不支持windows什么的
-                byte[] pfxBytes = certificate.Export(X509ContentType.Pfx, Helper.GlobalString);
+                byte[] pfxBytes1 = certificate.Export(X509ContentType.Pfx, Helper.GlobalString);
                 certificate.Dispose();
-#pragma warning disable SYSLIB0057 // 类型或成员已过时
-                certificate = new X509Certificate2(pfxBytes, Helper.GlobalString);
-#pragma warning restore SYSLIB0057 // 类型或成员已过时
+                certificate = new X509Certificate2(pfxBytes1, Helper.GlobalString);
             }
         }
     }

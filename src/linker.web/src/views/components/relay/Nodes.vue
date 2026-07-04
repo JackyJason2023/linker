@@ -1,6 +1,6 @@
 <template>
     <div>
-        <el-dialog v-model="state.show" :title="$t('server.relayTitle')" width="98%" top="2vh">
+        <el-dialog append-to=".app-wrap" v-model="state.show" :title="$t('relay.title')" width="80rem" top="2vh">
             <div>
                 <AccessShow value="ImportRelayNode">
                     <div class="head mgb-1" v-if="state.super">
@@ -14,7 +14,7 @@
                     </div>
                 </AccessShow>
                 <el-table :data="state.nodes" size="small" border height="500" stripe>
-                    <el-table-column property="Name" :label="$t('server.relayName')">
+                    <el-table-column property="Name" :label="$t('relay.name')">
                         <template #default="scope">
                             <div class="flex"> 
                                 <div>
@@ -39,10 +39,10 @@
                                     <p class="flex">
                                         <div>
                                             <template v-if="state.syncData.Key == scope.row.NodeId">
-                                                <el-checkbox size="small" disabled checked>{{ scope.row.Host }}</el-checkbox>
+                                                <el-checkbox size="small" disabled checked>默认</el-checkbox>
                                             </template>
                                             <template v-else>
-                                                <el-checkbox size="small" disabled @click.stop="handleShowSync(scope.row, 1)">{{ scope.row.Host }}</el-checkbox>
+                                                <el-checkbox size="small" disabled @click.stop="handleShowSync(scope.row, 1)">默认</el-checkbox>
                                             </template>
                                         </div>
                                         <span class="flex-1"></span>
@@ -57,7 +57,7 @@
                             </div>
                         </template>
                     </el-table-column>
-                    <el-table-column property="ConnectionsRatio" :label="$t('server.relayConnection')" width="80">
+                    <el-table-column property="ConnectionsRatio" :label="$t('relay.conn')" width="80">
                         <template #default="scope">
                             <p>
                                 <template v-if="scope.row.Connections == 0">--</template>
@@ -66,7 +66,7 @@
                             <p><strong>{{scope.row.ConnectionsRatio}}</strong></p>
                         </template>
                     </el-table-column>
-                     <el-table-column property="Bandwidth" :label="$t('server.relaySpeed1')" width="100">
+                     <el-table-column property="Bandwidth" :label="$t('relay.speed1')" width="100">
                         <template #default="scope">
                             <p>
                                 <template v-if="scope.row.Bandwidth == 0">--</template>
@@ -75,7 +75,7 @@
                             <p><strong>{{scope.row.BandwidthRatio}}Mbps</strong></p>
                         </template>
                     </el-table-column>
-                    <el-table-column property="DataEachMonth" :label="$t('server.relayFlow')" width="100">
+                    <el-table-column property="DataEachMonth" :label="$t('relay.flow')" width="100">
                         <template #default="scope">
                             <template v-if="scope.row.DataEachMonth == 0">
                                 <p>--</p>
@@ -87,7 +87,7 @@
                             </template>
                         </template>
                     </el-table-column>
-                    <el-table-column property="BandwidthEach" :label="$t('server.relaySpeed')" width="80">
+                    <el-table-column property="BandwidthEach" :label="$t('relay.speed')" width="80">
                         <template #default="scope">
                             <p>
                                 <span v-if="scope.row.BandwidthEach == 0">--</span>
@@ -96,7 +96,7 @@
                             <p>{{ scope.row.Delay }}ms</p>
                         </template>
                     </el-table-column> 
-                    <el-table-column  property="Manageable" :label="$t('server.relayOper')" width="110">
+                    <el-table-column  property="Manageable" :label="$t('common.oper')" width="110">
                         <template #default="scope">
                             <p>
                                 <AccessBoolean v-if="state.super" value="RemoveRelayNode,UpdateRelayNode,ShareRelayNode,RebootRelayNode">
@@ -118,9 +118,9 @@
             </div>
         </el-dialog>
         <EditNode v-if="state.showEdit" v-model="state.showEdit" :data="state.current"></EditNode>
-        <el-dialog class="options-center" :title="$t('server.relaySetDefault')" destroy-on-close v-model="state.showSync" width="54rem" top="2vh">
+        <el-dialog append-to=".app-wrap" class="options-center" :title="$t('relay.default')" destroy-on-close v-model="state.showSync" width="54rem" top="2vh">
             <div>
-                <div class="t-c">{{ $t('server.relaySetDefaultText') }}</div>
+                <div class="t-c">{{ $t('relay.default.alert') }}</div>
                 <Ids ref="domIds"></Ids>
                 <div class="t-c w-100 mgt-1">
                     <el-button @click="handleCancelSync">{{$t('common.cancel')}}</el-button>
@@ -194,7 +194,7 @@ export default {
                 Data:state.syncData
             }).then((res)=>{
                 state.showSync = false;
-                ElMessage.success(t('common.oper'));
+                ElMessage.success(t('common.opered'));
                 _getDefault();
             }).catch(()=>{
                 _getDefault();
@@ -207,13 +207,13 @@ export default {
         }
 
         const handleExit = (row)=>{
-            ElMessageBox.confirm(t('server.relayExit'), t('common.confirm'), {
+            ElMessageBox.confirm(t('relay.exit'), t('common.confirm'), {
                 confirmButtonText: t('common.confirm'),
                 cancelButtonText: t('common.cancel'),
                 type: 'warning',
             }).then(() => {
                 relayExit(row.NodeId).then(res => {
-                    ElMessage.success(t('common.oper'));
+                    ElMessage.success(t('common.opered'));
                 }).catch(()=>{
                     ElMessage.error(t('common.operFail'));
                 });
@@ -223,13 +223,13 @@ export default {
         }
         const handleUpgrade = (row)=>{
             if(row._manager == false) return;
-            ElMessageBox.confirm(`${t('server.relayUpdate')} ${globalData.value.signin.Version}`,t('server.relayUpdate'), {
+            ElMessageBox.confirm(`${t('relay.update')} ${globalData.value.signin.Version}`,t('relay.update'), {
                 confirmButtonText: t('common.confirm'),
                 cancelButtonText: t('common.cancel'),
                 type: 'warning',
             }).then(() => {
                 relayUpgrade({Key:row.NodeId,Value:globalData.value.signin.Version}).then(res => {
-                    ElMessage.success(t('common.oper'));
+                    ElMessage.success(t('common.opered'));
                 }).catch(()=>{
                     ElMessage.error(t('common.operFail'));
                 });
@@ -239,13 +239,13 @@ export default {
         }
 
         const handleRemove = (row)=>{
-            ElMessageBox.confirm(t('server.relayRemove'), t('common.confirm'), {
+            ElMessageBox.confirm(t('relay.remove'), t('common.confirm'), {
                 confirmButtonText: t('common.confirm'),
                 cancelButtonText: t('common.cancel'),
                 type: 'warning',
             }).then(() => {
                 relayRemove(row.NodeId).then(res => {
-                    ElMessage.success(t('common.oper'));
+                    ElMessage.success(t('common.opered'));
                 }).catch(()=>{
                     ElMessage.error(t('common.operFail'));
                 });
@@ -254,7 +254,7 @@ export default {
             });
         }
         const handleImport = ()=>{
-            ElMessageBox.prompt(t('server.relayImport'), t('common.confirm'), {
+            ElMessageBox.prompt(t('relay.import'), t('common.confirm'), {
                 confirmButtonText:  t('common.confirm'),
                 cancelButtonText: t('common.cancel')
             }).then(({ value }) => {
@@ -263,7 +263,7 @@ export default {
                     if(res){
                         ElMessage.error(res);
                     }else{
-                        ElMessage.success(t('common.oper'));
+                        ElMessage.success(t('common.opered'));
                     }
                 }).catch(()=>{})
             }).catch(() => {
@@ -271,7 +271,7 @@ export default {
         }
         const handleShare = (row)=>{
             relayShare(row.NodeId).then((res)=>{
-                ElMessageBox.prompt(t('server.relayShare'), t('common.tips'), {
+                ElMessageBox.prompt(t('relay.share'), t('common.tips'), {
                     confirmButtonText:  t('common.confirm'),
                     cancelButtonText: t('common.cancel'),
                     inputValue:res

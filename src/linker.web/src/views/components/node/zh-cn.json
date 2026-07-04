@@ -1,0 +1,8 @@
+{
+    "deny.title":"【{0}】上的主机",
+    "deny.online":"在线的主机",
+    "deny.list":"禁用列表",
+    "deny.add":"禁用",
+    "deny.str":"项",
+    "deny.remark":"备注"
+}

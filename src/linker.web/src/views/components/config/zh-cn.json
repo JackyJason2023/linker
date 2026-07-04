@@ -1,0 +1,27 @@
+{
+    "messenger": "信标服务器",
+    "messenger.addr": "服务器地址",
+    "messenger.alert": "IP/域名:端口、端口默认1802",
+    "messenger.super.key": "服务器密钥",
+    "messenger.super.password": "服务器密码",
+    "messenger.userid": "用户id",
+    "messenger.userid.alert": "你的唯一标识",
+
+    "export": "导出配置",
+    "export.alert": "导出配置，客户端覆盖配置文件，或粘贴配置信息，或在线加载",
+    "export.signle": "单设备",
+    "export.name": "设备名",
+    "export.name.alert": "请输入设备名",
+    "export.psswd": "管理密码",
+    "export.psswd.alert": "请输入接口密码",
+    "export.webport": "管理端口",
+    "export.webport.alert": "请输入网页端口",
+    "export.download": "下载",
+    "export.copy": "复制",
+    "export.save": "保存",
+    "export.updater": "更新配置",
+    "export.server": "服务器配置",
+    "export.super": "服务器密码",
+    "export.group": "当前分组",
+    "export.tunnel": "隧道协议"
+}

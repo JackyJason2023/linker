@@ -75,7 +75,7 @@ namespace linker.messenger.plan
             {
             }
         }
-        private void RunSetup()
+        private Task RunSetup()
         {
             try
             {
@@ -87,6 +87,7 @@ namespace linker.messenger.plan
             catch (Exception)
             {
             }
+            return Task.CompletedTask;
         }
         private void RunLoop()
         {

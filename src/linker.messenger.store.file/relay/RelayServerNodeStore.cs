@@ -71,7 +71,7 @@ namespace linker.messenger.store.file.relay
                 BandwidthEach = info.BandwidthEach,
             }, c => c.NodeId == info.NodeId);
             LoadNodes();
-            return await Task.FromResult(length > 0).ConfigureAwait(false); ;
+            return await Task.FromResult(length > 0).ConfigureAwait(false);
         }
 
         private void LoadNodes()

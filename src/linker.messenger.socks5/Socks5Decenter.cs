@@ -12,6 +12,7 @@ namespace linker.messenger.socks5
         public VersionManager PushVersion { get; } = new VersionManager();
         public VersionManager DataVersion { get; } = new VersionManager();
         public bool Force => socks5Infos.Count < 2;
+        public int Count => socks5Infos.Count;
 
         private readonly ConcurrentDictionary<string, Socks5Info> socks5Infos = new ConcurrentDictionary<string, Socks5Info>();
         public ConcurrentDictionary<string, Socks5Info> Infos => socks5Infos;
@@ -39,10 +40,11 @@ namespace linker.messenger.socks5
         /// <summary>
         /// 刷新信息，把自己的配置发给别人，顺便把别人的信息带回来
         /// </summary>
-        public void Refresh()
+        public async Task Refresh()
         {
             PushVersion.Increment();
             OnRefresh();
+            await Task.CompletedTask.ConfigureAwait(false);
         }
         public Memory<byte> GetData()
         {

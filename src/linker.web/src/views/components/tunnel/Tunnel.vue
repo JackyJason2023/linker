@@ -1,41 +1,58 @@
 <template>
     <AccessBoolean value="TunnelChangeSelf,TunnelChangeOther">
         <template #default="{values}">
-            <el-table-column prop="tunnel" :label="$t('home.tunnel')" width="86">
+            <el-table-column prop="tunnel" :label="$t('network')" width="104">
                 <template #default="scope">
                     <template v-if="scope.row && scope.row.hook_tunnel">
                         <div class="skeleton-animation" :style="`animation-delay:${scope.row.animationDelay}ms`">
-                            <div>
+                            <div class="nowrap">
                                 <template v-if="scope.row.hook_tunnel.Net.CountryCode">
-                                    <img 
-                                    :title="`${scope.row.hook_tunnel.Net.CountryCode}、${scope.row.hook_tunnel.Net.City}`" 
-                                    class="system" 
-                                    :src="`https://unpkg.com/flag-icons@7.2.3/flags/4x3/${scope.row.hook_tunnel.Net.CountryCode.toLowerCase()}.svg`" />
+                                    <img class="system" :title="`${scope.row.hook_tunnel.Net.CountryCode}、${scope.row.hook_tunnel.Net.City}`" :src="`https://unpkg.com/flag-icons@7.2.3/flags/4x3/${scope.row.hook_tunnel.Net.CountryCode.toLowerCase()}.svg`" />
                                 </template>
                                 <template v-else>
                                     <img title="?" class="system" src="/system.svg" />
                                 </template>
                                 <template v-if="scope.row.hook_tunnel.Net.Isp">
-                                    <img 
-                                    :title="`${scope.row.hook_tunnel.Net.Isp}`" 
-                                    class="system" :src="netImg(scope.row.hook_tunnel.Net)" />
+                                    <img class="system" :title="`${scope.row.hook_tunnel.Net.Isp}`" :src="netImg(scope.row.hook_tunnel.Net)" />
                                 </template>
                                 <template v-else>
-                                    <img title="?" class="system" src="/system.svg" />
+                                    <img class="system" title="?" src="/system.svg" />
                                 </template>
                                 <template v-if="scope.row.hook_tunnel.Net.Nat">
-                                    <span class="nat" :title="scope.row.hook_tunnel.Net.Nat">{{ natMap[scope.row.hook_tunnel.Net.Nat]  }}</span>
+                                    <span class="nat" :class="{
+                                        green:scope.row.hook_tunnel.Net.nat_number>=50,
+                                        yellow:scope.row.hook_tunnel.Net.nat_number>0 && scope.row.hook_tunnel.Net.nat_number<50,
+                                        red:scope.row.hook_tunnel.Net.nat_number==0
+                                    }" :title="scope.row.hook_tunnel.Net.nat_text">{{ scope.row.hook_tunnel.Net.nat_number }}%</span>
                                 </template>
                                 <template v-else>
                                     <img title="?" class="system" src="/system.svg" />
                                 </template>
                             </div> 
-                            <div class="flex">
+                            <div class="nowrap flex">
+                                <template v-if="scope.row.hook_counter">
+                                    <a href="javascript:;" class="a-line" :title="`${$t('network.upnp.remark')}
+1、${$t('network.upnp.ip')} : ${scope.row.hook_counter['upnp-w']}  ${scope.row.hook_counter['upnp-w']>0?'✅':'❌'}
+2、${$t('network.upnp.device')} : ${scope.row.hook_counter['upnp-d']} ${scope.row.hook_counter['upnp-d']>0?'✅':'❌'}
+3、${$t('network.upnp.local')} : ${scope.row.hook_counter['upnp-l']} ${scope.row.hook_counter['upnp-l']>0?'✅':'❌'}
+4、${$t('network.upnp.remote')} : ${scope.row.hook_counter['upnp-r']} ${scope.row.hook_counter['upnp-r']>0?'✅':'❌'}`"
+                                    @click="handleUpnp(scope.row.hook_tunnel,scope.row,values)"
+                                    :class="scope.row.hook_counter['upnp-w'] > 0 && scope.row.hook_counter['upnp-d'] > 0
+                                        ? 'green' : (scope.row.hook_counter['upnp-w']> 0 || scope.row.hook_counter['upnp-d'] > 0
+                                        ? 'yellow' : '')">
+                                        <img class="system" 
+                                        :src="scope.row.hook_counter['upnp-w'] > 0 && scope.row.hook_counter['upnp-d'] > 0
+                                            ? '/upnp-green.svg' : (scope.row.hook_counter['upnp-w']> 0 || scope.row.hook_counter['upnp-d'] > 0
+                                            ? '/upnp-yellow.svg' : '/upnp.svg')"/>
+                                        <span>{{ scope.row.hook_counter['upnp-l'] }}-{{ scope.row.hook_counter['upnp-r'] }}</span>
+                                    </a>
+                                </template>
+                                
+                                <span class="flex-1"></span>
                                 <a href="javascript:;" class="a-line" 
-                                :class="{yellow:scope.row.hook_tunnel.NeedReboot}" 
-                                :title="$t('home.holeText')"
-                                @click="handleTunnel(scope.row.hook_tunnel,scope.row,values)">
-                                    <span>{{$t('home.jump')}}:{{scope.row.hook_tunnel.RouteLevel}}+{{scope.row.hook_tunnel.RouteLevelPlus}}</span>
+                                    :class="{yellow:scope.row.hook_tunnel.NeedReboot,green:scope.row.hook_tunnel.Mesh.Enabled}"
+                                    @click="handleTunnel(scope.row.hook_tunnel,scope.row,values)">
+                                    {{scope.row.hook_tunnel.RouteLevel}}+{{scope.row.hook_tunnel.RouteLevelPlus}}
                                 </a>
                             </div>
                         </div>
@@ -44,17 +61,21 @@
                         <div class="skeleton-animation">
                             <el-skeleton animated >
                                 <template #template>
-                                    <el-skeleton-item variant="text" class="el-skeleton-item" />
-                                    <el-skeleton-item variant="text" class="el-skeleton-item" />
-                                    <el-skeleton-item variant="text" class="el-skeleton-item-last"/>
-                                    <el-skeleton-item variant="text" class="el-skeleton-item2" />
+                                    <div class="nowrap">
+                                        <el-skeleton-item variant="text" class="w-20- mgr-1-" />
+                                        <el-skeleton-item variant="text" class="w-20- mgr-1-" />
+                                        <el-skeleton-item variant="text" class="w-20-" />
+                                    </div>
+                                    <div class="nowrap">
+                                        <el-skeleton-item variant="text" class="w-50-" />
+                                        <el-skeleton-item variant="text" class="w-50-" />
+                                    </div>
                                 </template>
                             </el-skeleton>
                         </div>
                     </template>
                     <div class="device-remark"></div>
                 </template>
-
             </el-table-column>
         </template>
     </AccessBoolean>
@@ -87,6 +108,8 @@ export default {
             'aliyun':'aliyun.svg',
             'alibaba':'aliyun.svg',
             'jdcom':'jdcom.svg',
+            'jdcom':'jdcom.svg',
+            'cloudflare':'cloudflare.svg'
         }
         const regex = new RegExp(Object.keys(imgMap).map(item => `\\b${item}\\b`).join("|"));
         const netImg = (item)=>{
@@ -98,17 +121,6 @@ export default {
                 }
             }
             return `./system.svg`;
-        }
-        const natMap = {
-            "Unknown":'?',
-            "UnsupportedServer":'?',
-            "UdpBlocked":'?',
-            "OpenInternet":'?',
-            "SymmetricUdpFirewall":'?',
-            "FullCone":'1',
-            "RestrictedCone":'2',
-            "PortRestrictedCone":'3',
-            "Symmetric":'4',
         }
 
         const handleTunnel = (_tunnel,row,access) => {
@@ -127,8 +139,25 @@ export default {
             tunnel.value.current = _tunnel;
             tunnel.value.showEdit = true;
         }
+        const handleUpnp = (_tunnel,row,access)=>{
+            if(machineId.value === _tunnel.MachineId){
+                if(!access.TunnelChangeSelf){
+                    ElMessage.success(t('common.access'));
+                    return;
+                }
+            }else{
+                if(!access.TunnelChangeOther){
+                    ElMessage.success(t('common.access'));
+                    return;
+                }
+            }
+            _tunnel.device = row;
+            tunnel.value.current = _tunnel;
+            tunnel.value.showUpnp = true;
+        }
+
         return {
-            handleTunnel,netImg,natMap
+            handleTunnel,handleUpnp,netImg
         }
     }
 }
@@ -137,8 +166,6 @@ export default {
 
 .el-switch.is-disabled{opacity :1;}
 
-.green{font-weight:bold;}
-
 .el-skeleton-item{width: 30%;margin-right:3%}
 .el-skeleton-item-last{width: 30%;}
 .el-skeleton-item2{width: 70%}
@@ -146,12 +173,12 @@ export default {
 
 img.system,span.nat{
     height:1.4rem;
-    margin-right:.4rem
-    border: 1px solid #eee;
+    margin-right:.2rem;
+    border: 1px solid var(--table-border-color);
     line-height:1.4rem;
     vertical-align:middle;
 }
-html.dark img.system,html.dark span.nat{border-color:#575c61;}
 
 span.nat{display:inline-block;padding:0 .2rem;margin-right:0;font-family: cursive;}
+.nowrap{line-height:1.8rem;}
 </style>

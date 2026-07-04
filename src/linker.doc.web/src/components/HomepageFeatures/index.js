@@ -4,29 +4,29 @@ import styles from './styles.module.css';
 
 const FeatureList = [
     {
-        title: '跨平台、高性能、可视化',
+        title: '打洞+中继+内网穿透',
         Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
         description: (
             <>
-                跨平台、高性能、web管理，SSL加密
+                牛逼
             </>
         ),
     },
     {
-        title: '打洞、中继、内网穿透',
+        title: '可视化UI管理',
         Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
         description: (
             <>
-                TCP+UDP打洞、服务器中继、服务器穿透
+                牛逼
             </>
         ),
     },
     {
-        title: '异地组网',
+        title: '虚拟网卡+端口转发+socks5/http代理',
         Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
         description: (
             <>
-                虚拟网卡组网，点/网对网、网段映射
+                牛逼
             </>
         ),
     },

@@ -1,5 +1,5 @@
 <template>
-    <a v-if="state.super" @click="state.showManager = true" href="javascript:;" class="mgr-1 a-line">{{$t('server.wlist')}}</a>
+    <a v-if="state.super" @click="state.showManager = true" href="javascript:;" class="mgr-1 a-line">{{$t('wlist')}}</a>
     <Manager v-if="state.showManager" v-model="state.showManager" :type="state.type" :prefix="state.prefix"/>
 </template>
 

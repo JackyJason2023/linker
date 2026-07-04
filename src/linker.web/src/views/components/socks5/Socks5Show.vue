@@ -2,20 +2,20 @@
     <AccessBoolean value="Socks5ChangeSelf,Socks5ChangeOther,Socks5StatusSelf,Socks5StatusOther">
         <template #default="{values}">
             <div class="flex">
-                <div class="flex-1">
+                <div class="nowrap flex-1">
                     <ConnectionShow :row="item" transactionId="socks5"></ConnectionShow>
-                    <a href="javascript:;" class="a-line" @click="handleSocks5Port(item.hook_socks5,values)" title="此设备的socks5代理">
+                    <a href="javascript:;" class="a-line" @click="handleSocks5Port(item.hook_socks5,values)" :title="$t('socks5')">
                         <template v-if="item.hook_socks5.SetupError">
                             <strong class="red" :title="item.hook_socks5.SetupError">
-                                socks5://*:{{ item.hook_socks5.Port }}
+                                //:{{ item.hook_socks5.Port }}
                             </strong>
                         </template>
                         <template v-else>
                             <template v-if="item.Connected &&item.hook_socks5.running">
-                                <strong class="green gateway">socks5://*:{{ item.hook_socks5.Port }}</strong>
+                                <strong class="green">//:{{ item.hook_socks5.Port }}</strong>
                             </template>
                             <template v-else>
-                                <span>socks5://*:{{ item.hook_socks5.Port }}</span>
+                                <span>//:{{ item.hook_socks5.Port }}</span>
                             </template>
                         </template>
                     </a>
@@ -30,29 +30,27 @@
                     </el-switch>
                 </template>
             </div>
-            <div>
-                <div>
-                    <template v-for="(item1,index) in  item.hook_socks5.Lans" :key="index">
-                        <template v-if="item1.Disabled">
-                            <div class="flex disable" title="已禁用">
-                                <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
-                                <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
-                            </div>
-                        </template>
-                        <template v-else-if="item1.Exists">
-                            <div class="flex yellow" title="与其它设备填写IP、或本机局域网IP有冲突">
-                                <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
-                                <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
-                            </div>
-                        </template>
-                        <template v-else>
-                            <div class="flex green" title="正常使用" :class="{green:item.Connected && item.hook_socks5.running}">
-                                <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
-                                <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
-                            </div>
-                        </template>
+            <div class="nowrap">
+                <template v-for="(item1,index) in  item.hook_socks5.Lans" :key="index">
+                    <template v-if="item1.Disabled">
+                        <div class="flex disable" :title="$t('socks5.show.disabled')">
+                            <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
+                            <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
+                        </div>
                     </template>
-                </div>
+                    <template v-else-if="item1.Exists">
+                        <div class="flex yellow" :title="$t('socks5.show.clash')">
+                            <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
+                            <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
+                        </div>
+                    </template>
+                    <template v-else>
+                        <div class="flex green" :title="$t('socks5.show.normal')" :class="{green:item.Connected && item.hook_socks5.running}">
+                            <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
+                            <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
+                        </div>
+                    </template>
+                </template>
             </div>
         </template>
     </AccessBoolean>
@@ -66,11 +64,13 @@ import {Loading} from '@element-plus/icons-vue'
 import { injectGlobalData } from '@/provide';
 import { computed } from 'vue';
 import ConnectionShow from '../tunnel/ConnectionShow.vue';
+import { useI18n } from 'vue-i18n';
 export default {
     props:['item','config'],
     components:{Loading,ConnectionShow},
     setup (props) {
         
+        const {t} = useI18n();
         const socks5 = useSocks5();
         const globalData = injectGlobalData();
         const machineId = computed(() => globalData.value.config.Client.Id);
@@ -81,22 +81,22 @@ export default {
             }
             if(machineId.value === _socks5.MachineId){
                 if(!access.Socks5StatusSelf){
-                ElMessage.success('无权限');
+                ElMessage.success(t('common.access'));
                 return;
             }
             }else{
                 if(!access.Socks5StatusOther){
-                ElMessage.success('无权限');
+                ElMessage.success(t('common.access'));
                 return;
             }
             }
             const fn = props.item.Connected && _socks5.running ? stopSocks5 (_socks5.MachineId) : runSocks5(_socks5.MachineId);
             _socks5.loading = true;
             fn.then(() => {
-                ElMessage.success('操作成功！');
+                ElMessage.success(t('common.opered'));
             }).catch((err) => {
                 console.log(err);
-                ElMessage.error('操作失败！');
+                ElMessage.error(t('common.operFail'));
             })
         }
         const handleSocks5Port = (_socks5,access) => {
@@ -105,12 +105,12 @@ export default {
             }
             if(machineId.value === _socks5.MachineId){
                 if(!access.Socks5ChangeSelf){
-                ElMessage.success('无权限');
+                ElMessage.success(t('common.access'));
                 return;
             }
             }else{
                 if(!access.Socks5ChangeOther){
-                ElMessage.success('无权限');
+                ElMessage.success(t('common.access'));
                 return;
             }
             }
@@ -136,10 +136,10 @@ export default {
     vertical-align:middle;font-weight:bold;
     animation:loading 1s linear infinite;
 }
-
-.el-switch.is-disabled{opacity :1;}
-.el-input{
-    width:8rem;
+.el-switch{
+    height:1.8rem;
+    line-height:1.8rem;
+    &.is-disabled{opacity :1;}
 }
 
 .remark{
@@ -151,9 +151,8 @@ export default {
     max-width: 100%;
     color:#666;
 }
-
-.switch-btn{
-    font-size:1.5rem;
+.nowrap{
+    line-height:1.8rem;
 }
 
 </style>

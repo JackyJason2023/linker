@@ -16,7 +16,7 @@ namespace linker.messenger.signin
 
         private void Helper_OnAppExit(object sender, EventArgs e)
         {
-            Disponse();
+            Dispose();
         }
 
         public string SignInHost { get; set; }
@@ -46,49 +46,49 @@ namespace linker.messenger.signin
         /// </summary>
         [JsonIgnore]
         public Func<Task> OnSignInBrfore { get; set; } = async () => { await Task.CompletedTask; };
-        public async Task PushSignInBefore()
+        public Task PushSignInBefore()
         {
-            await OnSignInBrfore?.Invoke();
+            return OnSignInBrfore?.Invoke();
         }
 
 
         private int signInTimes = 0;
         [JsonIgnore]
-        public Action OnSignInSuccessBefore { get; set; } = () => { };
+        public Func<Task> OnSignInSuccessBefore { get; set; } = () => { return Task.CompletedTask; };
         /// <summary>
         /// 上线事件
         /// </summary>
         [JsonIgnore]
-        public Action<int> OnSignInSuccess { get; set; } = (i) => { };
+        public Func<int, Task> OnSignInSuccess { get; set; } = (i) => { return Task.CompletedTask; };
         /// <summary>
         /// 第一次上线
         /// </summary>
         [JsonIgnore]
-        public Action OnSignInSuccessFirstTime { get; set; } = () => { };
+        public Func<Task> OnSignInSuccessFirstTime { get; set; } = () => { return Task.CompletedTask; };
 
         /// <summary>
         /// 发布上线事件
         /// </summary>
-        public void PushSignInSuccessBefore()
+        public Task PushSignInSuccessBefore()
         {
-            OnSignInSuccessBefore?.Invoke();
+            return OnSignInSuccessBefore?.Invoke();
         }
         /// <summary>
         /// 发布上线事件
         /// </summary>
-        public void PushSignInSuccess()
+        public async Task PushSignInSuccess()
         {
             if (signInTimes == 0)
             {
-                OnSignInSuccessFirstTime?.Invoke();
+                await (OnSignInSuccessFirstTime?.Invoke()).ConfigureAwait(false);
             }
-            OnSignInSuccess?.Invoke(signInTimes);
+            await (OnSignInSuccess?.Invoke(signInTimes)).ConfigureAwait(false);
             signInTimes++;
         }
 
-        public void Disponse()
+        public void Dispose()
         {
-            Connection?.Disponse();
+            Connection?.Dispose();
         }
     }
 }

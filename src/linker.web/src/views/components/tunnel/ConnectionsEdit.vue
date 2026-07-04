@@ -1,10 +1,12 @@
 <template>
-    <el-dialog v-model="state.show" append-to=".app-wrap" :title="`与[${state.device.MachineName}]的链接`" top="1vh" width="350">
+    <el-dialog append-to=".app-wrap" v-model="state.show" :title="$t('network.tunnel.title',[state.device.MachineName])" top="1vh" width="400">
         <div>
-            <el-descriptions border size="small" :column="1" label-width="6rem"  overlength-control="wrap">
-                <el-descriptions-item label="目标" >{{ state.connection.IPEndPoint }}</el-descriptions-item>
-                <el-descriptions-item label="事务" >{{ state.transactions[state.connection.TransactionId] }}</el-descriptions-item>
-                <el-descriptions-item label="协议" >
+            <el-descriptions border size="small" :column="1" label-width="8rem" >
+                <el-descriptions-item :label="$t('network.tunnel.target')" >
+                    <div class="break-all">{{ state.connection.IPEndPoint }}</div>
+                </el-descriptions-item>
+                <el-descriptions-item :label="$t('network.tunnel.trans')" >{{ state.transactions[state.connection.TransactionId] }}</el-descriptions-item>
+                <el-descriptions-item :label="$t('network.tunnel.proto')">
                     <div v-if="state.connection.Connected">
                         <p>{{ state.connection.TransportName }}({{ state.protocolTypes[state.connection.ProtocolType] }}) - {{ state.types[state.connection.Type] }}</p>
                         <p>{{ state.connection.SendBufferRemainingText }} - {{ state.connection.RecvBufferRemainingText }}</p>
@@ -12,39 +14,54 @@
                 </el-descriptions-item>
                 <el-descriptions-item label="SSL" >{{ state.connection.SSL }}</el-descriptions-item>
                 
-                <el-descriptions-item label="上传" >
+                <el-descriptions-item :label="$t('network.tunnel.up')">
                     <div>
                         <p><span>{{ state.connection.SendBytesText }}</span></p>
                     </div>
                 </el-descriptions-item>
-                 <el-descriptions-item label="下载" >
+                 <el-descriptions-item :label="$t('network.tunnel.down')">
                     <div>
                         <p><span>{{ state.connection.ReceiveBytesText }}</span></p>
                     </div>
                 </el-descriptions-item>
                 
-                <el-descriptions-item label="中继" >
+                <el-descriptions-item :label="$t('network.tunnel.relay')">
                     <div>
-                        <!-- <a v-if="state.connecting" href="javascript:;" class="a-line">
-                            <span>操作中.</span><el-icon size="14" class="loading"><Loading /></el-icon>
-                        </a> -->
-                        <a href="javascript:;" class="a-line" @click="handleNode">{{ state.nodesDic[state.connection.NodeId] || '选择节点' }}</a>
-                    </div>
-                </el-descriptions-item>
-                <el-descriptions-item label="打洞" >
-                    <div>
-                        <a v-if="state.connecting" href="javascript:;" class="a-line">
-                            <span>操作中.</span><el-icon size="14" class="loading"><Loading /></el-icon>
+                        <a v-if="state.operating.relay" href="javascript:;" class="a-line">
+                            <span>{{$t('network.tunnel.manual')}}</span><el-icon size="14" class="loading"><Loading /></el-icon>
                         </a>
-                        <a v-else href="javascript:;" class="a-line" @click="handlep2p">尝试打洞</a>
+                        <a v-else href="javascript:;" class="a-line" @click="handleRelayNode">{{ state.relayNodesDic[state.connection.NodeId] || $t('network.tunnel.relay') }}</a>
                     </div>
                 </el-descriptions-item>
-                <el-descriptions-item label="延迟" >{{ state.connection.Delay }}</el-descriptions-item>
-                 <el-descriptions-item label="操作" >
+                <el-descriptions-item :label="$t('network.tunnel.mesh')">
+                    <div>
+                        <a v-if="state.operating.mesh" href="javascript:;" class="a-line">
+                            <span>{{$t('network.tunnel.manual')}}</span><el-icon size="14" class="loading"><Loading /></el-icon>
+                        </a>
+                        <a v-else href="javascript:;" class="a-line" @click="handleMeshNode">{{$t('network.tunnel.mesh') }}</a>
+                    </div>
+                </el-descriptions-item>
+                <el-descriptions-item :label="$t('network.tunnel.p2p')">
+                    <div>
+                        <a v-if="state.operating.hand" href="javascript:;" class="a-line">
+                            <span>{{$t('network.tunnel.manual')}}</span><el-icon size="14" class="loading"><Loading /></el-icon>
+                        </a>
+                        <template v-else>
+                            <a href="javascript:;" class="a-line" @click="handlep2p">{{$t('network.tunnel.p2p')}}</a>
+                            <span class="mgl-1">{{$t('network.tunnel.auto')}}<el-icon v-if="state.operating.default" size="14" class="loading"><Loading /></el-icon></span>
+                            <span class="mgl-1">{{$t('network.tunnel.back')}}<el-icon v-if="state.operating.back" size="14" class="loading"><Loading /></el-icon></span>
+                            <span class="mgl-1">{{$t('network.tunnel.mesh')}}<el-icon v-if="state.operating.mesh" size="14" class="loading"><Loading /></el-icon></span>
+                        </template>
+                    </div>
+                </el-descriptions-item>
+                <el-descriptions-item :label="$t('network.tunnel.delay')" >{{ state.connection.Delay }}</el-descriptions-item>
+                 <el-descriptions-item :label="$t('common.oper')" >
                     <div>
                         <AccessShow value="TunnelRemove">
-                            <el-popconfirm confirm-button-text="确认" cancel-button-text="取消"
-                                title="确定关闭此连接?" @confirm="handleDel">
+                            <el-popconfirm 
+                            :confirm-button-text="$t('common.confirm')" 
+                            :cancel-button-text="$t('common.cancel')"
+                            :title="$t('common.closeSure')" @confirm="handleDel">
                                 <template #reference>
                                     <el-button type="danger" size="small"><el-icon>
                                             <Delete />
@@ -57,58 +74,8 @@
             </el-descriptions>
         </div>
     </el-dialog>
-    <el-dialog v-model="state.showNodes" :title="$t('server.relayTitle')" width="98%" top="2vh">
-        <div>
-            <el-table :data="state.nodes" size="small" border height="600">
-                <el-table-column property="Name" :label="$t('server.relayName')">
-                    <template #default="scope">
-                        <div>
-                            <a :href="scope.row.Url" class="a-line blue" target="_blank">{{ scope.row.Name }}</a>
-                        </div>
-                    </template>
-                </el-table-column>
-                <el-table-column property="ConnectionsRatio" :label="$t('server.relayConnection')" width="80">
-                    <template #default="scope">
-                        <span><strong>{{ scope.row.ConnectionsRatio }}</strong></span>
-                    </template>
-                </el-table-column>
-                <el-table-column property="BandwidthEach" :label="$t('server.relaySpeed')" width="140">
-                    <template #default="scope">
-                        <p>
-                            <span>{{ scope.row.BandwidthRatio }}Mbps</span>
-                            <span> / </span>
-                            <span v-if="scope.row.BandwidthEach == 0">--</span>
-                            <span v-else>{{ scope.row.BandwidthEach }}Mbps</span>
-                        </p>
-                    </template>
-                </el-table-column>
-                 <el-table-column property="DataEachMonth" :label="$t('server.relayFlow')" width="100">
-                    <template #default="scope">
-                        <span v-if="scope.row.DataEachMonth == 0">--</span>
-                        <span v-else>
-                            {{ (scope.row.DataRemain / 1024 / 1024 / 1024).toFixed(2) }}GB
-                        </span>
-                    </template>
-                </el-table-column>
-                <el-table-column property="Delay" :label="$t('server.relayDelay')" width="60">
-                    <template #default="scope">
-                        <span>{{ scope.row.Delay }}ms</span>
-                    </template>
-                </el-table-column>
-                <el-table-column property="Public" :label="$t('server.relayPublic')" width="50">
-                    <template #default="scope">
-                        <el-switch disabled v-model="scope.row.Public" size="small" />
-                    </template>
-                </el-table-column>
-                <el-table-column property="Oper" :label="$t('server.relayUse')" width="130">
-                    <template #default="scope">
-                        <el-button size="small" v-if="(scope.row.Protocol & 1) == 1" @click="handleConnect(scope.row, 1)">TCP</el-button>
-                        <el-button size="small" v-if="(scope.row.Protocol & 2) == 2" @click="handleConnect(scope.row, 2)">UDP</el-button>
-                    </template>
-                </el-table-column>
-            </el-table>
-        </div>
-    </el-dialog>
+    <RelayNodes v-if="state.showRelayNodes" v-model="state.showRelayNodes" :nodes="state.relayNodes" @onrelay="handleRelayConnect"></RelayNodes>
+    <MeshNodes v-if="state.showMeshNodes" v-model="state.showMeshNodes" :nodes="state.meshNodes" @onmesh="handleMeshConnect"></MeshNodes>
 </template>
 <script>
 import { reactive, watch, computed, onMounted, onUnmounted } from 'vue';
@@ -119,10 +86,14 @@ import { injectGlobalData } from '@/provide';
 import { relayConnect, setRelaySubscribe } from '@/apis/relay';
 import { useI18n } from 'vue-i18n';
 import { removeTunnelConnection, tunnelConnect } from '@/apis/tunnel';
+import { meshConnect, meshGetNodes } from '@/apis/mesh';
+import { useDevice } from '../device/devices';
+import RelayNodes from './RelayNodes.vue';
+import MeshNodes from './MeshNodes.vue';
 export default {
     props: ['modelValue'],
     emits: ['change', 'update:modelValue'],
-    components: { Delete, Select, ArrowDown,Loading },
+    components: { Delete, Select, ArrowDown,Loading,RelayNodes,MeshNodes },
     setup(props, { emit }) {
 
         const { t } = useI18n();
@@ -130,21 +101,25 @@ export default {
 
         const connections = useConnections();
         const connection =  computed(() =>connections.value.device.hook_connection? connections.value.device.hook_connection[connections.value.transactionId] || {} :{});
+        const device = useDevice();
 
         const state = reactive({
             show: true,
-            protocolTypes: { 1: 'tcp', 2: 'udp', 4: 'msquic' },
-            types: { 0: '打洞', 1: '中继', 2: '节点' },
-            transactions: { 'forward': '端口转发', 'tuntap': '虚拟网卡', 'socks5': '代理转发' },
+            protocolTypes: { 1: 'tcp', 2: 'udp' },
+            types: { 0: t('network.tunnel.p2p'), 1: t('network.tunnel.relay'), 2: t('network.tunnel.mesh') },
+            transactions: { 'forward': t('forward'), 'tuntap': t('tuntap'), 'socks5': t('socks5') },
             device: connections.value.device,
             transactionId: connections.value.transactionId,
-            connecting:computed(()=>connections.value.device.hook_operating?connections.value.device.hook_operating[connections.value.transactionId]:false),
+            operating:computed(()=> connections.value.device.hook_operating?connections.value.device.hook_operating[connections.value.transactionId]:{}),
             connection:connection,
 
-            showNodes: false,
-            nodes: [],
-            nodesDic: {},
-            timer: 0
+            showRelayNodes: false,
+            relayNodes:[],
+            relayNodesDic:{},
+            timer:0,
+
+            showMeshNodes:false,
+            meshNodes:[]
         });
         watch(() => state.show, (val) => {
             if (!val) {
@@ -156,15 +131,81 @@ export default {
         });
         const handleDel = () => {
             removeTunnelConnection(state.device.MachineId,state.transactionId).then(() => {
-                ElMessage.success(t('common.oper'));
+                ElMessage.success(t('common.opered'));
             }).catch(() => { });
         }
 
+        const filterProfiles = (profiles)=>{
+            return profiles.filter(c=>c.Disabled == false);
+        }
+        const getFec = ()=>{
+            try{
+                const self = filterProfiles(device.page.List[0].hook_tuntap.FecProfile);
+                if(self.length > 0){
+                    return self
+                }
+                const other = filterProfiles(connections.value.device.hook_tuntap.FecProfile);
+                if(other.length > 0){
+                    return other
+                }
+            }catch(e){
+            }
+            return []
+        }
+        const getConfigures = ()=>{
+            return {
+                "fec":JSON.stringify(getFec())
+            }
+        }
+        const handlep2p = ()=>{
+            tunnelConnect({
+                ToMachineId:state.device.MachineId,
+                TransactionId:state.transactionId,
+                DenyProtocols:state.transactionId == 'tuntap' ? 4 : 2,
+                Configures:getConfigures()
+            }).then(()=>{
+                ElMessage.success(t('common.opered'));
+            }).catch(()=>{ElMessage.success(t('common.operFail'));})
+        }
+        const handleMeshNode = ()=>{
+            meshGetNodes(state.device.MachineId).then((res)=>{
+                state.showMeshNodes = true;
+                state.meshNodes = res;
+            })
+        }
+        const handleMeshConnect = ([nodeId])=>{
+            meshConnect({
+                ToMachineId:state.device.MachineId,
+                TransactionId:state.transactionId,
+                NodeId:nodeId,
+                Configures:getConfigures()
+            }).then(()=>{
+                ElMessage.success(t('common.opered'));
+            }).catch(()=>{ElMessage.success(t('common.operFail'));});
+            state.showMeshNodes = false;
+        }
+
+
+        const handleRelayNode = () => {
+            state.showRelayNodes = true;
+        }
+        const handleRelayConnect = ([row, protocol]) => {
+            const json = {
+                FromMachineId: globalData.value.config.Client.Id,
+                TransactionId: state.transactionId,
+                ToMachineId: state.device.MachineId,
+                NodeId: row.NodeId,
+                Protocol: protocol,
+                Configures:getConfigures()
+            };
+            relayConnect(json).then(() => {ElMessage.success(t('common.opered')); }).catch(() => {ElMessage.success(t('common.operFail')); });
+            state.showRelayNodes = false;
+        }
         const _setRelaySubscribe = () => {
             clearTimeout(state.timer);
             setRelaySubscribe().then((res) => {
-                state.nodes = res;
-                state.nodesDic = res.reduce((a, b) => {
+                state.relayNodes = res.filter(c=>c.LastTicks < 15000);
+                state.relayNodesDic = res.reduce((a, b) => {
                     a[b.NodeId] = b.Name;
                     return a;
                 }, {});
@@ -174,42 +215,19 @@ export default {
             });
         }
 
-        const handlep2p = ()=>{
-            tunnelConnect({
-                ToMachineId:state.device.MachineId,
-                TransactionId:state.transactionId,
-                DenyProtocols:state.transactionId == 'tuntap' ? 4 : 2
-            }).then(()=>{
-                ElMessage.success(t('common.oper'));
-            }).catch(()=>{ElMessage.success(t('common.operFail'));})
-        }
-
-        const handleNode = () => {
-            state.showNodes = true;
-        }
-        const handleConnect = (row, protocol) => {
-            const json = {
-                FromMachineId: globalData.value.config.Client.Id,
-                TransactionId: state.transactionId,
-                ToMachineId: state.device.MachineId,
-                NodeId: row.NodeId,
-                Protocol: protocol
-            };
-            relayConnect(json).then(() => {ElMessage.success(t('common.oper')); }).catch(() => {ElMessage.success(t('common.operFail')); });
-            state.showNodes = false;
-        }
-
         onMounted(() => {
-            connections.value.updateRealTime(true);
             _setRelaySubscribe();
+            connections.value.updateRealTime(true);
         });
         onUnmounted(() => {
+            clearTimeout(state.timer)
             connections.value.updateRealTime(false);
-            clearTimeout(state.timer);
-        })
+        });
 
         return {
-            state, handleDel,handlep2p, handleNode, handleConnect
+            state, handleDel,handlep2p,
+             handleRelayNode, handleRelayConnect,
+             handleMeshNode,handleMeshConnect
         }
     }
 }

@@ -8,12 +8,12 @@ namespace linker.messenger.signin.args
     public sealed class SignInArgsVersionClient : ISignInArgsClient
     {
         public string Name => "version";
-        public SignInArgsLevel Level =>  SignInArgsLevel.Default;
+        public SignInArgsLevel Level => SignInArgsLevel.Default;
 
-        public async Task<string> Invoke(string host, Dictionary<string, string> args)
+        public Task<string> Invoke(string host, Dictionary<string, string> args)
         {
             args.TryAdd("version", VersionHelper.Version);
-            return await Task.FromResult(string.Empty);
+            return Task.FromResult(string.Empty);
         }
     }
 
@@ -31,13 +31,13 @@ namespace linker.messenger.signin.args
         /// <param name="signInfo">新登录参数</param>
         /// <param name="cache">之前的登录信息</param>
         /// <returns></returns>
-        public async Task<string> Validate(SignInfo signInfo, SignCacheInfo cache)
+        public Task<string> Validate(SignInfo signInfo, SignCacheInfo cache)
         {
-            if (VersionHelper.Compare(signInfo.Version, "v1.5.0", false) < 0)
+            if (VersionHelper.Compare(signInfo.Version, "v1.9.8", false) < 0)
             {
-                return "need v1.5.0+";
+                return Task.FromResult("need v1.9.8+");
             }
-            return await Task.FromResult(string.Empty);
+            return Task.FromResult(string.Empty);
         }
     }
 }

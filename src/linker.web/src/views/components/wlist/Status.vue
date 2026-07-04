@@ -1,8 +1,8 @@
 <template>
     <div>
         <a v-if="state.status.Enabled" @click="handleImport" href="javascript:;" class="a-line blue">
-            <img :src="`./${state.status.Type}.png`" height="20" style="vertical-align: middle;">
-            <span>使用{{state.status.Type}}订单</span>
+            <img :src="`./${state.status.Type}.png`" height="20" class="middle">
+            <span>{{$t('wlist.order.use',[state.status.Type])}}</span>
         </a>
         <strong v-if="state.status.Info" class="mgl-1">
             {{state.status.Info.Bandwidth}}Mbps、{{ state.status.Info.UseTime.split(' ')[0] }}-{{ state.status.Info.EndTime.split(' ')[0] }}
@@ -15,19 +15,21 @@ import { wlistAddOrder, wlistStatus } from '@/apis/wlist';
 import { injectGlobalData } from '@/provide';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { onMounted, reactive } from 'vue';
+import { useI18n } from 'vue-i18n';
 export default {
     props:['type'],
     setup (props) {
         
+        const {t} = useI18n();
         const globalData = injectGlobalData();
         const state = reactive({
             status:{}
         });
 
         const handleImport = ()=>{
-            ElMessageBox.prompt('', '订单号', {
-                confirmButtonText: '确认',
-                cancelButtonText: '取消',
+            ElMessageBox.prompt('', t('wlist.order'), {
+                confirmButtonText: t('common.confirm'),
+                cancelButtonText: t('common.cancel'),
             }).then(({ value }) => {
                 if(value){
                     wlistAddOrder({

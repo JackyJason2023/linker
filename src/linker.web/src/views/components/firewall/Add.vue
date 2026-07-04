@@ -1,5 +1,5 @@
 <template>
-   <el-dialog class="options-center" :title="$t('firewall.rule')" destroy-on-close v-model="state.show" width="50rem" top="2vh">
+   <el-dialog append-to=".app-wrap" class="options-center" :title="$t('firewall.rule')" destroy-on-close v-model="state.show" width="50rem" top="2vh">
         <div>
             <el-form ref="ruleFormRef" :model="state.ruleForm.Data" :rules="state.rules" label-width="auto">
                 <el-form-item :label="$t('firewall.srcName')" prop="SrcId">
@@ -49,7 +49,7 @@
                 </el-form-item>
                 <el-form-item></el-form-item>
                 <el-form-item :label="$t('firewall.orderby')" prop="OrderBy">
-                     <el-input-number v-model="state.ruleForm.Data.OrderBy" :min="0" :max="65535" style="width:13rem" />
+                     <el-input-number v-model="state.ruleForm.Data.OrderBy" :min="0" :max="65535" class="w-13" />
                 </el-form-item>
                 <el-form-item :label="$t('firewall.disabled')" prop="Disabled">
                     <div class="flex">
@@ -69,7 +69,7 @@
             </el-form>
         </div>
     </el-dialog>
-    <el-dialog class="options-center" :title="$t('firewall.srcName')" destroy-on-close v-model="state.showSrcName" width="54rem" top="2vh">
+    <el-dialog append-to=".app-wrap" class="options-center" :title="$t('firewall.srcName')" destroy-on-close v-model="state.showSrcName" width="54rem" top="2vh">
         <div>
             <el-transfer class="src-tranfer"
                 v-model="state.srcIdValues"
@@ -171,7 +171,7 @@ export default {
                 const json = JSON.parse(JSON.stringify(state.ruleForm));
                 json.Data.Protocol = state.protocolChecks.reduce((a,b)=>a|b,0);
                 addFirewall(json).then(()=>{
-                    ElMessage.success(t('common.oper'));
+                    ElMessage.success(t('common.opered'));
                     state.show = false;
                     emit('success');
                 }).catch(()=>{

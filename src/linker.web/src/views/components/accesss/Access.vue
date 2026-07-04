@@ -1,10 +1,10 @@
 <template>
     <el-row>
         <el-col :span="8">
-            <el-checkbox v-model="state.checkAll" @change="handleCheckAllChange" label="全选" :indeterminate="state.isIndeterminate" />
+            <el-checkbox v-model="state.checkAll" @change="handleCheckAllChange" :label="$t('access.checkall')" :indeterminate="state.isIndeterminate" />
         </el-col>
         <el-col :span="8" v-if="globalData.config.Client.FullAccess">
-            <el-checkbox v-model="state.full" ><span class="red">满权限(顶级管理权)</span></el-checkbox>
+            <el-checkbox v-model="state.full" ><span class="red">{{$t('access.full')}}</span></el-checkbox>
         </el-col>
         <el-col :span="6">
             <el-input size="small" v-model="state.search"></el-input>

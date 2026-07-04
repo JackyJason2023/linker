@@ -1,0 +1,5 @@
+{
+    "action.text": "Set action static Json parameters",
+    "action.jsonError": "Json format error",
+    "action.title": "Verification Parameters for {0}"
+}

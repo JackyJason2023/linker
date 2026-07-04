@@ -1,70 +1,50 @@
 <template>
-     <el-dialog v-model="state.show" :close-on-click-modal="false" append-to=".app-wrap" :title="`设置[${state.machineName}]网关`" width="560" top="2vh">
+     <el-dialog append-to=".app-wrap" v-model="state.show" :close-on-click-modal="false" :title="`设置[${state.machineName}]网关`" width="560" top="2vh">
         <div>
             <el-form ref="ruleFormRef" :model="state.ruleForm" :rules="state.rules" label-width="auto">
-                <el-form-item label="" prop="alert">
-                    <div>网关层级为你的设备与外网的距离，你可以手动调整数值</div>
-                </el-form-item>
-                <el-form-item label="">
-                    <el-row class="w-100">
-                        <el-col :span="12">
-                            <el-form-item label="网关层级" prop="RouteLevel">
-                                <el-input v-trim readonly v-model="state.ruleForm.RouteLevel" style="width:15rem" />
-                            </el-form-item>
-                        </el-col>
-                        <el-col :span="12">
-                            <el-form-item label="加上" prop="RouteLevelPlus">
+                <el-form-item label="" prop="">
+                    <div class="w-100">
+                        <el-descriptions :column="2" size="small" border >
+                            <el-descriptions-item :label="$t('network.level')">
+                                    <el-input v-trim readonly v-model="state.ruleForm.RouteLevel" class="w-15" />
+                            </el-descriptions-item>
+                            <el-descriptions-item :label="$t('network.plus')">
                                 <el-input-number v-model="state.ruleForm.RouteLevelPlus" />
-                            </el-form-item>
-                        </el-col>
-                    </el-row>
-                </el-form-item>
-                <el-form-item label="">
-                    <el-row class="w-100">
-                        <el-col :span="12">
-                            <el-form-item label="外网端口" prop="PortMapWan">
+                            </el-descriptions-item>
+                            <el-descriptions-item :label="$t('network.upnp.pport')">
                                 <el-input-number v-model="state.ruleForm.PortMapWan" />
-                            </el-form-item>
-                        </el-col>
-                        <el-col :span="12">
-                            <el-form-item label="内网端口" prop="PortMapLan">
+                            </el-descriptions-item>
+                            <el-descriptions-item :label="$t('network.upnp.lport')">
                                 <el-input-number v-model="state.ruleForm.PortMapLan" />
-                            </el-form-item>
-                        </el-col>
-                    </el-row>
+                            </el-descriptions-item>
+                            <el-descriptions-item :label="$t('network.inip')" span="2">
+                                <el-input v-model="state.ruleForm.InIp" class="w-15"/>
+                            </el-descriptions-item>
+                            <el-descriptions-item :label="$t('network.mesh.bandwidth')">
+                                <el-input v-model="state.ruleForm.Mesh.Bandwidth" class="w-10"/>Mbps
+                            </el-descriptions-item>
+                            <el-descriptions-item :label="$t('network.mesh.enabled')">
+                                <el-checkbox v-model="state.ruleForm.Mesh.Enabled">{{ $t('network.mesh.enabled') }}</el-checkbox>
+                            </el-descriptions-item>
+                        </el-descriptions>
+                    </div>
                 </el-form-item>
-                <el-form-item label="">
-                    <el-row class="w-100">
-                        <el-col :span="12">
-                            <el-form-item label="入口IP" prop="InIp">
-                                <el-input v-model="state.ruleForm.InIp" style="width:15rem"/>
-                            </el-form-item>
-                        </el-col>
-                        <el-col :span="12">
-                            <span>入口ip与出口ip不一致时填写</span>
-                        </el-col>
-                    </el-row>
-                </el-form-item>
-                
                 <el-form-item label="" prop="alert" v-if="state.net.HostName">
-                    <div>
-                        <h3>{{ state.net.HostName }}</h3>
-                        <ul>
+                    <div class="w-100">
+                        <el-descriptions :column="2" size="small" border :title="state.net.HostName" >
                             <template v-for="(item,index) in state.net.Lans.filter(c=>c.Ips.length > 0)">
-                                <li>
-                                    <div>【{{ item.Mac||'00-00-00-00-00-00' }}】{{ item.Desc }}</div>
-                                    <div class="pdl-20">{{ item.Ips.join('、') }}</div>
-                                </li>
+                                <el-descriptions-item :label="$t('network.name')">{{ item.Desc }}</el-descriptions-item>
+                                <el-descriptions-item :label="$t('network.mac')">{{ item.Mac||'00-00-00-00-00-00' }}</el-descriptions-item>
+                                <el-descriptions-item :label="$t('network.ip')" :span="2">{{ item.Ips.join('、') }}</el-descriptions-item>
                             </template>
-                        </ul>
-                        <h3>跳跃点</h3>
-                        <div class="pdl-20">{{ state.net.Routes.join('、') }}</div>
+                            <el-descriptions-item :label="$t('network.jump')">{{ state.net.Routes.join('、') }}</el-descriptions-item>
+                        </el-descriptions>
                     </div>
                 </el-form-item>
                 <el-form-item label="" prop="Btns">
                     <div class="t-c w-100">
-                        <el-button @click="state.show = false">取消</el-button>
-                        <el-button type="primary" @click="handleSave">确认</el-button>
+                        <el-button @click="state.show = false">{{ $t('common.cancel') }}</el-button>
+                        <el-button type="primary" @click="handleSave">{{ $t('common.confirm') }}</el-button>
                     </div>
                 </el-form-item>
             </el-form>
@@ -76,12 +56,14 @@ import {getTunnelNetwork, setTunnelRouteLevel } from '@/apis/tunnel';
 import { ElMessage } from 'element-plus';
 import { onMounted, reactive, ref, watch } from 'vue';
 import { useTunnel } from './tunnel';
+import { useI18n } from 'vue-i18n';
 
 export default {
     props: ['modelValue'],
     emits: ['change','update:modelValue'],
     setup(props, { emit }) {
 
+        const {t} = useI18n();
         const tunnel = useTunnel();
         const ruleFormRef = ref(null);
         const state = reactive({
@@ -92,7 +74,11 @@ export default {
                 RouteLevelPlus: tunnel.value.current.RouteLevelPlus,
                 PortMapWan: tunnel.value.current.PortMapWan,
                 PortMapLan: tunnel.value.current.PortMapLan,
-                InIp: tunnel.value.current.InIp
+                InIp: tunnel.value.current.InIp,
+                Mesh:{
+                    Enabled:tunnel.value.current.Mesh.Enabled,
+                    Bandwidth:tunnel.value.current.Mesh.Bandwidth,
+                }
             },
             rules: {},
             net:{}
@@ -112,13 +98,15 @@ export default {
             json.PortMapWan = +state.ruleForm.PortMapWan;
             json.PortMapLan = +state.ruleForm.PortMapLan;
             json.InIp = state.ruleForm.InIp;
+            json.Mesh.Bandwidth = +state.ruleForm.Mesh.Bandwidth;
+            json.Mesh.Enabled = state.ruleForm.Mesh.Enabled;
             setTunnelRouteLevel(json).then(() => {
                 state.show = false;
-                ElMessage.success('已操作！');
+                ElMessage.success(t('common.opered'));
                 emit('change')
             }).catch((err) => {
                 console.log(err);
-                ElMessage.error('操作失败！');
+                ElMessage.error(t('common.operFail'));
             });
         }
 

@@ -10,7 +10,7 @@ cd ../../
 mkdir -p public/publish-fpk/docker
 cp -rf install-package/fpk/docker/* public/publish-fpk/docker
 
-sed -i "s|{version}|2.0.0|g" public/publish-fpk/docker/manifest
+sed -i "s|{version}|2.0.15|g" public/publish-fpk/docker/manifest
 sed -i 's/\r$//' public/publish-fpk/docker/manifest
 sed -i 's/\r$//' public/publish-fpk/docker/cmd/main
 sed -i 's/\r$//' public/publish-fpk/docker/cmd/uninstall_callback
@@ -19,7 +19,7 @@ cd public/publish-fpk/docker
 
 tar -czf app.tgz --transform='s,app/,,g' app/docker app/ui config
 tar -czf linker.fpk --exclude='app' *
-mv linker.fpk linker-docker.fpk
+mv linker.fpk linker-fnos-docker.fpk
 
 cd ../../../
 
@@ -49,7 +49,7 @@ do
     fi
 
 
-    sed -i "s|{version}|2.0.0|g" public/publish-fpk/bin/${r}/manifest
+    sed -i "s|{version}|2.0.15|g" public/publish-fpk/bin/${r}/manifest
     sed -i "s|{arch}|${arch}|g" public/publish-fpk/bin/${r}/manifest
     sed -i 's/\r$//' public/publish-fpk/bin/${r}/manifest
     sed -i 's/\r$//' public/publish-fpk/bin/${r}/cmd/main
@@ -59,7 +59,7 @@ do
 
     tar -czf app.tgz --transform='s,app/,,g' app/server app/ui app/www config
     tar -czf linker.fpk --exclude='app' *
-    mv linker.fpk linker-bin-${r}.fpk
+    mv linker.fpk linker-fnos-bin-${r}.fpk
 
     cd ../../../../
 done

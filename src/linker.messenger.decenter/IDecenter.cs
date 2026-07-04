@@ -19,6 +19,8 @@ namespace linker.messenger.decenter
 
         public bool Force { get; }
 
+        public int Count { get; }
+
         /// <summary>
         /// 获取本地数据
         /// </summary>

@@ -22,6 +22,7 @@ namespace linker.tunnel
         /// 加密密钥
         /// </summary>
         public X509Certificate Certificate { get; }
+        public X509Certificate CertificateExport { get; }
 
         /// <summary>
         /// 端口映射内外端口
@@ -38,7 +39,7 @@ namespace linker.tunnel
         /// 获取远端的外网信息，比如你是A，你要获取B的信息，可以在B调用  TunnelTransfer.GetWanPort() 发送回来
         /// </summary>
         public Task<TunnelTransportWanPortInfo> GetRemoteWanPort(TunnelWanPortProtocolInfo info);
-       
+
 
         /// <summary>
         /// 发送开始打洞
@@ -57,8 +58,9 @@ namespace linker.tunnel
         /// 获取打洞排除IP
         /// </summary>
         /// <returns></returns>
-        public List<TunnelExIPInfo> GetExcludeIps();
+        public List<TunnelExclusionPolicyInfo> GetExclusionPolicy();
 
+        public Task<List<string>> GetTunnelTransportMachineIds();
         /// <summary>
         /// 获取打洞协议列表
         /// </summary>
@@ -76,5 +78,14 @@ namespace linker.tunnel
         /// <param name="list"></param>
         /// <returns></returns>
         public Task<bool> SetTunnelTransports(string machineid, List<ITunnelTransport> list);
+
+        public Task<List<PublicEndpointSample>> LoadRadarSamples();
+        public Task<bool> SaveRadarSamples(List<PublicEndpointSample> samples);
+    }
+
+    public sealed class TunnelExclusionPolicyInfo
+    {
+        public IPAddress IP { get; set; }
+        public byte PrefixLength { get; set; }
     }
 }

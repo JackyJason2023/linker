@@ -1,0 +1,11 @@
+{
+    "head.home": "Home",
+    "head.server": "Server",
+    "head.protocol": "Proto",
+    "head.action": "Action",
+    "head.firewall": "Firewall",
+    "head.wakeup": "Wakeup",
+    "head.logger": "Logs",
+    "head.refresh": "Refresh",
+    "head.about": "About"
+}

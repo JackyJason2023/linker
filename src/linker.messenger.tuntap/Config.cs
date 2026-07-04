@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+﻿using linker.libs.extends;
 using System.Net;
 
 namespace linker.messenger.tuntap
@@ -15,12 +15,19 @@ namespace linker.messenger.tuntap
         /// </summary>
         public byte PrefixLength { get; set; } = 24;
 
+        public int Mtu { get; set; }
+
+        public int MssFix { get; set; }
+
         /// <summary>
         /// 局域网配置列表
         /// </summary>
-        public List<TuntapLanInfo> Lans { get; set; } = new List<TuntapLanInfo>();
+        public List<TuntapLanInfo> Lans { get; set; } = [];
 
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; } = "linker";
+        public string NetworkName { get; set; } = string.Empty;
+        public TuntapVlsmStatus VlsmStatus { get; set; } = TuntapVlsmStatus.None;
+
 
         public Guid Guid { get; set; } = Guid.Parse("771EF382-8718-5BC5-EBF0-A28B86142278");
 
@@ -37,9 +44,11 @@ namespace linker.messenger.tuntap
         /// <summary>
         /// 端口转发列表
         /// </summary>
-        public List<TuntapForwardInfo> Forwards { get; set; } = new List<TuntapForwardInfo>();
+        public List<TuntapForwardInfo> Forwards { get; set; } = [];
 
-        public Dictionary<string, TuntapGroup2IPInfo> Group2IP { get; set; } = new Dictionary<string, TuntapGroup2IPInfo>();
+        public List<TuntapFecProfileInfo> FecProfile { get; set; } = [];
+
+        public Dictionary<string, TuntapGroup2IPInfo> Group2IP { get; set; } = [];
 
         public bool DisableNat => (Switch & TuntapSwitch.DisableNat) == TuntapSwitch.DisableNat;
         public bool TcpMerge => (Switch & TuntapSwitch.TcpMerge) == TuntapSwitch.TcpMerge;
@@ -47,12 +56,18 @@ namespace linker.messenger.tuntap
         public bool Multicast => (Switch & TuntapSwitch.Multicast) == TuntapSwitch.Multicast;
         public bool FakeAck => (Switch & TuntapSwitch.FakeAck) == TuntapSwitch.FakeAck;
         public bool SrcProxy => (Switch & TuntapSwitch.SrcProxy) == TuntapSwitch.SrcProxy;
+
+
     }
 
     public sealed class TuntapGroup2IPInfo
     {
         public IPAddress IP { get; set; } = IPAddress.Any;
         public byte PrefixLength { get; set; } = 24;
+        public string Name { get; set; } = string.Empty;
+        public string NetworkName { get; set; } = string.Empty;
+        public int Mtu { get; set; } = 1420;
+        public int MssFix { get; set; }
     }
 
     public sealed partial class TuntapVeaLanIPAddress
@@ -75,6 +90,8 @@ namespace linker.messenger.tuntap
     public sealed partial class TuntapVeaLanIPAddressList
     {
         public string MachineId { get; set; }
+        public uint DstIp { get; set; }
+        public uint DstPrefixValue { get; set; }
         public List<TuntapVeaLanIPAddress> IPS { get; set; }
 
     }
@@ -99,6 +116,9 @@ namespace linker.messenger.tuntap
         /// 前缀长度
         /// </summary>
         public byte PrefixLength { get; set; } = 24;
+        public int Mtu { get; set; }
+        public int MssFix { get; set; }
+
         /// <summary>
         /// 网卡名
         /// </summary>
@@ -125,7 +145,7 @@ namespace linker.messenger.tuntap
         /// <summary>
         /// 端口转发列表
         /// </summary>
-        
+
         public List<TuntapForwardInfo> Forwards { get; set; } = new List<TuntapForwardInfo>();
         /// <summary>
         /// 开关，多个bool集合
@@ -361,6 +381,12 @@ namespace linker.messenger.tuntap
                 }
             }
         }
+
+        public string NetworkName { get; set; }
+
+        public TuntapVlsmStatus VlsmStatus { get; set; } = TuntapVlsmStatus.None;
+
+        public List<TuntapFecProfileInfo> FecProfile { get; set; } = [];
     }
 
 
@@ -375,6 +401,8 @@ namespace linker.messenger.tuntap
         public string Remark { get; set; } = string.Empty;
 
         public string Error { get; set; } = string.Empty;
+
+        public bool Disabled { get; set; }
     }
 
     public sealed partial class TuntapForwardTestWrapInfo
@@ -466,7 +494,34 @@ namespace linker.messenger.tuntap
         /// <summary>
         /// 源代理
         /// </summary>
-        SrcProxy = 1024,
+        SrcProxy = 1024
+    }
+    public enum TuntapVlsmStatus : byte
+    {
+        /// <summary>
+        /// 未设置
+        /// </summary>
+        None = 0,
+        /// <summary>
+        /// 丢弃
+        /// </summary>
+        Drop = 1,
+        /// <summary>
+        /// 单向
+        /// </summary>
+        OneWay = 2,
+        /// <summary>
+        /// 双向
+        /// </summary>
+        TwoWay = 4
+    }
+
+    public sealed partial class TuntapFecProfileInfo
+    {
+        public TuntapFecProfileInfo() { }
+        public int SourceSymbols { get; set; }
+        public int RepairSymbols { get; set; }
+        public bool Disabled { get; set; }
     }
 
 

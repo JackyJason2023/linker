@@ -14,6 +14,7 @@ namespace linker.messenger.access
         public VersionManager DataVersion { get; } = new VersionManager();
 
         public bool Force => Accesss.Count < 2;
+        public int Count => Accesss.Count;
 
         public ConcurrentDictionary<string, BitArray> Accesss { get; } = new ConcurrentDictionary<string, BitArray>();
 
@@ -28,7 +29,7 @@ namespace linker.messenger.access
             this.accessStore = accessStore;
             this.serializer = serializer;
 
-            signInClientState.OnSignInSuccess += (times) => PushVersion.Increment();
+            signInClientState.OnSignInSuccess += (times) => { PushVersion.Increment(); return Task.CompletedTask;  };
             accessStore.OnChanged += PushVersion.Increment;
 
         }

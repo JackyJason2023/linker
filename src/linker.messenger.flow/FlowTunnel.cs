@@ -1,10 +1,9 @@
 ﻿using linker.libs;
 using linker.libs.extends;
 using linker.messenger.channel;
-using linker.messenger.pcp;
 using linker.messenger.signin;
-using linker.messenger.tuntap;
 using linker.messenger.tuntap.cidr;
+using linker.messenger.tuntap.client;
 using linker.tunnel;
 using linker.tunnel.connection;
 using System.Collections.Concurrent;
@@ -16,12 +15,12 @@ namespace linker.messenger.flow
     {
         private readonly FlowTunnel flowTunnel;
 
-        public FlowTuntapProxy(FlowTunnel flowTunnel, ISignInClientStore signInClientStore, TunnelTransfer tunnelTransfer, PcpTransfer pcpTransfer,
+        public FlowTuntapProxy(FlowTunnel flowTunnel, ISignInClientStore signInClientStore, TunnelTransfer tunnelTransfer,
             SignInClientTransfer signInClientTransfer, TuntapConfigTransfer tuntapConfigTransfer,
             TuntapCidrConnectionManager tuntapCidrConnectionManager, TuntapCidrDecenterManager tuntapCidrDecenterManager,
-            TuntapCidrMapfileManager tuntapCidrMapfileManager,TuntapDecenter tuntapDecenter, ChannelConnectionCaching channelConnectionCaching) 
-            : base(signInClientStore, tunnelTransfer, pcpTransfer, signInClientTransfer,
-                  tuntapConfigTransfer, tuntapCidrConnectionManager, tuntapCidrDecenterManager, tuntapCidrMapfileManager, tuntapDecenter, channelConnectionCaching)
+            TuntapDecenter tuntapDecenter, ChannelConnectionCaching channelConnectionCaching) 
+            : base(signInClientStore, tunnelTransfer,  signInClientTransfer,
+                  tuntapConfigTransfer, tuntapCidrConnectionManager, tuntapCidrDecenterManager, tuntapDecenter, channelConnectionCaching)
         {
             this.flowTunnel = flowTunnel;
         }

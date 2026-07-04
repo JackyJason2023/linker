@@ -1,35 +1,35 @@
 <template>
     <AccessBoolean value="TuntapChangeSelf,TuntapChangeOther,TuntapStatusSelf,TuntapStatusOther">
         <template #default="{values}">
-            <div class="flex">
+            <div class="nowrap flex">
                 <div class="flex-1">
                     <ConnectionShow :row="item" transactionId="tuntap"></ConnectionShow>         
-                    <a href="javascript:;" class="a-line" @click="handleTuntapIP(item.hook_tuntap,values)" title="虚拟网卡IP">
+                    <a href="javascript:;" class="a-line" @click="handleTuntapIP(item.hook_tuntap,values)" :title="$t('tuntap.show.title')">
                         <template v-if="item.Connected">
                             <template v-if="item.hook_tuntap.SetupError">
-                                <strong class="red" :title="`setup ${item.hook_tuntap.SetupError}`">{{ item.hook_tuntap.IP }}</strong>
+                                <strong class="red" :title="`setup ${item.hook_tuntap.SetupError}`">{{ item.hook_tuntap.IP }}/{{ item.hook_tuntap.PrefixLength }}</strong>
                             </template>
                             <template v-else-if="item.hook_tuntap.Exists">
-                                <strong class="red" title="IP存在冲突，请使用新IP">{{ item.hook_tuntap.IP }}</strong>
+                                <strong class="red" :title="$t('tuntap.show.clash')">{{ item.hook_tuntap.IP }}/{{ item.hook_tuntap.PrefixLength }}</strong>
                             </template>
                             <template v-else-if="item.hook_tuntap.Available == false">
-                                <strong class="disable" title="IP不生效，可能是设备不在线">{{ item.hook_tuntap.IP }}</strong>
+                                <strong class="disable" :title="$t('tuntap.show.offline')">{{ item.hook_tuntap.IP }}/{{ item.hook_tuntap.PrefixLength }}</strong>
                             </template>
                             <template v-else-if="item.hook_tuntap.NatError">
-                                <strong class="yellow" :title="`nat ${item.hook_tuntap.NatError}`">{{ item.hook_tuntap.IP }}</strong>
+                                <strong class="yellow" :title="`nat ${item.hook_tuntap.NatError}`">{{ item.hook_tuntap.IP }}/{{ item.hook_tuntap.PrefixLength }}</strong>
                             </template>
                             <template v-else-if="item.hook_tuntap.AppNat && item.hook_tuntap.running">
-                                <strong class="app-nat" :title="`虚拟网卡IP\r\n应用层DNAT`">{{ item.hook_tuntap.IP }}</strong>
+                                <strong class="app-nat" :title="$t('tuntap.show.dnat')">{{ item.hook_tuntap.IP }}/{{ item.hook_tuntap.PrefixLength }}</strong>
                             </template>
                             <template v-else-if="item.hook_tuntap.running">
-                                <strong class="green gateway" :title="`虚拟网卡IP\r\n系统NAT`">{{ item.hook_tuntap.IP }}</strong>
+                                <strong class="green" :title="$t('tuntap.show.snat')">{{ item.hook_tuntap.IP }}/{{ item.hook_tuntap.PrefixLength }}</strong>
                             </template>
                             <template v-else>
-                                <strong>{{ item.hook_tuntap.IP }}</strong>
+                                <strong>{{ item.hook_tuntap.IP }}/{{ item.hook_tuntap.PrefixLength }}</strong>
                             </template>
                         </template>
                         <template v-else>
-                            <strong class="disable" title="IP不生效，可能是设备不在线">{{ item.hook_tuntap.IP }}</strong>
+                            <strong class="disable" :title="$t('tuntap.show.offline')">{{ item.hook_tuntap.IP }}/{{ item.hook_tuntap.PrefixLength }}</strong>
                         </template>
                     </a>
                 </div>
@@ -43,28 +43,28 @@
                     </el-switch>
                 </template>
             </div>
-            <div>
+            <div class="nowrap">
                 <template v-for="(item1,index) in  item.hook_tuntap.Lans" :key="index">
                     <template v-if="item.hook_tuntap.Available == false">
-                        <div class="lan flex disable" title="IP不生效，可能是设备不在线">
+                        <div class="flex disable" :title="$t('tuntap.show.offline')">
                             <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
                             <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
                         </div>
                     </template>
                     <template v-else-if="item1.Disabled">
-                        <div class="lan flex disable" title="已禁用">
+                        <div class="flex disable" :title="$t('tuntap.show.disabled')">
                             <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
                             <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
                         </div>
                     </template>
                     <template v-else-if="item1.Exists">
-                        <div class="lan flex yellow" title="与其它设备填写IP、或本机局域网IP有冲突、或与本机外网IP一致">
+                        <div class="flex yellow" :title="$t('tuntap.show.clash')">
                             <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
                             <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
                         </div>
                     </template>
                     <template v-else>
-                        <div class="lan flex green" title="正常使用">
+                        <div class="flex green" :title="$t('tuntap.show.normal')">
                             <span>{{ item1.IP }}/{{ item1.PrefixLength }}</span>
                             <span class="flex-1 remark" :title="item1.Remark">{{ item1.Remark }}</span>
                         </div>
@@ -91,11 +91,13 @@ import {Loading,Share} from '@element-plus/icons-vue'
 import { injectGlobalData } from '@/provide';
 import { computed } from 'vue';
 import ConnectionShow from '../tunnel/ConnectionShow.vue';
+import { useI18n } from 'vue-i18n';
 export default {
     props:['item','config'],
     components:{Loading,Share,ConnectionShow},
     setup (props) {
         
+        const {t} = useI18n();
         const tuntap = useTuntap();
         const globalData = injectGlobalData();
         const machineId = computed(() => globalData.value.config.Client.Id);
@@ -108,12 +110,12 @@ export default {
             }
             if(machineId.value === _tuntap.MachineId){
                 if(!access.TuntapStatusSelf){
-                ElMessage.success('无权限');
+                    ElMessage.success(t('common.access'));
                 return;
             }
             }else{
                 if(!access.TuntapStatusOther){
-                ElMessage.success('无权限');
+                    ElMessage.success(t('common.access'));
                 return;
             }
             }
@@ -121,25 +123,25 @@ export default {
             const fn = props.item.Connected && _tuntap.running ? stopTuntap (_tuntap.MachineId) : runTuntap(_tuntap.MachineId);
             _tuntap.loading = true;
             fn.then(() => {
-                ElMessage.success('操作成功！');
+                ElMessage.success(t('common.opered'));
             }).catch((err) => {
                 console.log(err);
-                ElMessage.error('操作失败！');
+                ElMessage.error(t('common.operFail'));
             })
         }
         const handleTuntapIP = (_tuntap,access) => {
             if(!props.config && machineId.value != _tuntap.MachineId){
-                ElMessage.success('无权限');
+                    ElMessage.success(t('common.access'));
                 return;
             }
             if(machineId.value === _tuntap.MachineId){
                 if(!access.TuntapChangeSelf){
-                    ElMessage.success('无权限');
+                    ElMessage.success(t('common.access'));
                     return;
                 }
             }else{
                 if(!access.TuntapChangeOther){
-                    ElMessage.success('无权限');
+                    ElMessage.success(t('common.access'));
                     return;
                 }
             }
@@ -168,12 +170,11 @@ export default {
     vertical-align:middle;font-weight:bold;
     animation:loading 1s linear infinite;
 }
-
-.el-switch.is-disabled{opacity :1;}
-.el-input{width:8rem;}
-.switch-btn{ font-size:1.5rem;}
-
-.lan{line-height:2rem}
+.el-switch{
+    height:1.8rem;
+    line-height:1.8rem;
+    &.is-disabled{opacity :1;}
+}
 .remark{
     padding-left:.4rem;
     text-align:right;
@@ -185,5 +186,5 @@ export default {
 }
 
 .delay{position: absolute;right:-8px;bottom:-8px;line-height:normal}
-
+.nowrap{line-height:1.8rem;}
 </style>

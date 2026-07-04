@@ -1,5 +1,5 @@
 <template>
-    <el-dialog class="options-center" :title="$t('status.flowOnline')" destroy-on-close v-model="state.show" width="77rem" top="2vh">
+    <el-dialog append-to=".app-wrap" class="options-center" :title="$t('flow.online')" destroy-on-close v-model="state.show" width="77rem" top="2vh">
         <div class="map-wrap" id="map">
         </div>
     </el-dialog>
@@ -52,8 +52,8 @@ export default {
                     const html = `
                         <div class="marker-content" >
                             <h3 class="marker-title" style="font-size:1.6rem">${item.MachineName}</h3>
-                            <div class="marker-text" style="font-size:1.3rem">${t('status.flowArea')} : ${net.CountryCode}、${net.City}</div>
-                            <div class="marker-text" style="font-size:1.3rem">${t('status.flowNet')} : ${net.Isp}</div>
+                            <div class="marker-text" style="font-size:1.3rem">${t('flow.area')} : ${net.CountryCode}、${net.City}</div>
+                            <div class="marker-text" style="font-size:1.3rem">${t('flow.net')} : ${net.Isp}</div>
                         </div>
                     `;
                     

@@ -4,6 +4,7 @@ using Microsoft.Win32.SafeHandles;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace linker.tun.device
 {
@@ -141,9 +142,40 @@ namespace linker.tun.device
             }
         }
 
+        public void SetMssFix(int value = 0)
+        {
+            CommandHelper.Linux(string.Empty, new string[] {
+                @$"iptables-save | grep -v -E -- ""-[oi] {Name}\s*.*\s* -j TCPMSS"" | iptables-restore",
+            });
+
+            if (value >= 7 && value < 1500)
+            {
+                string _value = value == 7 ? "--clamp-mss-to-pmtu" : $"--set-mss {value}";
+
+                string[] commands = new string[] {
+                    $"iptables -t mangle -A INPUT -i {Name} -p tcp --syn -j TCPMSS {_value}",
+                    $"iptables -t mangle -A INPUT -i {Name} -p tcp --tcp-flags SYN SYN -j TCPMSS {_value}",
+                    $"iptables -t mangle -A OUTPUT -o {Name} -p tcp --syn -j TCPMSS {_value}",
+                    $"iptables -t mangle -A OUTPUT -o {Name} -p tcp --tcp-flags SYN SYN -j TCPMSS {_value}",
+                    $"iptables -t mangle -A FORWARD -i {Name} -o {interfaceLinux} -p tcp --syn -j TCPMSS {_value}",
+                    $"iptables -t mangle -A FORWARD -i {Name} -o {interfaceLinux} -p tcp --tcp-flags SYN SYN -j TCPMSS {_value}",
+                    $"iptables -t mangle -A FORWARD -i {interfaceLinux} -o {Name} -p tcp --syn -j TCPMSS {_value}",
+                    $"iptables -t mangle -A FORWARD -i {interfaceLinux} -o {Name} -p tcp --tcp-flags SYN SYN -j TCPMSS {_value}",
+                };
+                string str = CommandHelper.Linux(string.Empty, commands);
+            }
+        }
         public void SetMtu(int value)
         {
-            CommandHelper.Linux(string.Empty, new string[] { $"ip link set dev {Name} mtu {value}" });
+            if (value > 0)
+            {
+                CommandHelper.Linux(string.Empty, new string[] { $"ip link set dev {Name} mtu {value}" });
+            }
+            else
+            {
+                CommandHelper.Linux(string.Empty, new string[] { $"ip link set dev {Name} mtu 1420" });
+            }
+
         }
 
         private string GetDefaultInterface()
@@ -153,30 +185,26 @@ namespace linker.tun.device
         public void SetNat(out string error)
         {
             error = string.Empty;
-            if (address == null || address.Equals(IPAddress.Any)) return;
+            if (address == null || address.Equals(IPAddress.Any))
+            {
+                return;
+            }
             try
             {
                 IPAddress network = NetworkHelper.ToNetworkIP(address, NetworkHelper.ToPrefixValue(prefixLength));
 
-                string support = CommandHelper.Linux(string.Empty, new string[] { "iptables -m state -h" }, out string supportError);
-                bool isSupport = string.IsNullOrWhiteSpace(supportError) && support.Contains("No such file or directory") == false;
-
-                string str = CommandHelper.Linux(string.Empty, new string[] {
+                string[] commands = new string[] {
                     $"sysctl -w net.ipv4.ip_forward=1",
+                    $"sysctl -w net.ipv4.conf.{Name}.forwarding=1",
+                    @$"iptables-save | grep -v -E -- ""-[oi] {Name}\s*.*\s* -j (ACCEPT|MASQUERADE|DROP|REJECT)"" | iptables-restore",
 
-                    $"iptables -A FORWARD -i {interfaceLinux} -o {Name} -j ACCEPT",
-                    $"iptables -A FORWARD -i {Name} -j ACCEPT",
+                    $"iptables -I FORWARD -i {Name} -j ACCEPT",
+                    $"iptables -I FORWARD -o {Name} -j ACCEPT",
 
-                    $"iptables -t nat -A POSTROUTING -o {Name} -j MASQUERADE",
-                    $"iptables -t nat -A POSTROUTING ! -o {Name} -s {network}/{prefixLength} -j MASQUERADE",
-
-                    isSupport ? $"iptables -A FORWARD -i {Name} -o {interfaceLinux} -m state --state ESTABLISHED,RELATED -j ACCEPT"
-                        :  $"iptables -A FORWARD -i {Name} -o {interfaceLinux} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT",
-
-                    isSupport ? $"iptables -A FORWARD -o {Name} -m state --state ESTABLISHED,RELATED -j ACCEPT"
-                    : $"iptables -A FORWARD -o {Name} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT",
-                });
-                RestartFirewall();
+                    $"iptables -t nat -I POSTROUTING -o {Name} -j MASQUERADE",
+                    $"iptables -t nat -I POSTROUTING ! -o {Name} -s {network}/{prefixLength} -j MASQUERADE",
+                };
+                string str = CommandHelper.Linux(string.Empty, commands);
             }
             catch (Exception ex)
             {
@@ -190,32 +218,11 @@ namespace linker.tun.device
             if (address == null || address.Equals(IPAddress.Any)) return;
             try
             {
-                string support = CommandHelper.Linux(string.Empty, new string[] { "iptables -m state -h" }, out string supportError);
-                bool isSupport = string.IsNullOrWhiteSpace(supportError) && support.Contains("No such file or directory") == false;
-
-                CommandHelper.Linux(string.Empty, new string[] {
-                    $"iptables -D FORWARD -i {interfaceLinux} -o {Name} -j ACCEPT",
-                    $"iptables -D FORWARD -i {Name} -j ACCEPT",
-                    $"iptables -t nat -D POSTROUTING -o {Name} -j MASQUERADE",
-
-                    isSupport ? $"iptables -D FORWARD -i {Name} -o {interfaceLinux} -m state --state ESTABLISHED,RELATED -j ACCEPT"
-                    : $"iptables -D FORWARD -i {Name} -o {interfaceLinux} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT",
-
-                    isSupport ? $"iptables -D FORWARD -o {Name} -m state --state ESTABLISHED,RELATED -j ACCEPT"
-                    : $"iptables -D FORWARD -o {Name} -m conntrack  --ctstate ESTABLISHED,RELATED -j ACCEPT"
-                });
-
-
-                IPAddress network = NetworkHelper.ToNetworkIP(address, NetworkHelper.ToPrefixValue(prefixLength));
-                string iptableLineNumbers = CommandHelper.Linux(string.Empty, new string[] { $"iptables -t nat -L --line-numbers | grep {network}/{prefixLength} | cut -d' ' -f1" });
-                if (string.IsNullOrWhiteSpace(iptableLineNumbers) == false)
-                {
-                    string[] commands = iptableLineNumbers.Split(Environment.NewLine)
-                        .Where(c => string.IsNullOrWhiteSpace(c) == false)
-                        .Select(c => $"iptables -t nat -D POSTROUTING {c}").ToArray();
-                    CommandHelper.Linux(string.Empty, commands);
-                }
-                RestartFirewall();
+                string[] commands = new string[] {
+                    @$"iptables-save | grep -v -E -- ""-[oi] {Name}\s*.*\s* -j (ACCEPT|MASQUERADE|DROP|REJECT)"" | iptables-restore",
+                    @$"iptables-save | grep -v -E -- ""-[oi] {Name}\s*.*\s* -j TCPMSS"" | iptables-restore",
+                };
+                string str = CommandHelper.Linux(string.Empty, commands);
             }
             catch (Exception ex)
             {
@@ -315,14 +322,20 @@ namespace linker.tun.device
 
         private readonly byte[] buffer = new byte[128 * 1024];
         private readonly object writeLockObj = new object();
-        public byte[] Read(out int length)
+        public byte[] Read(out uint length)
         {
             length = 0;
-            if (safeFileHandle == null) return Helper.EmptyArray;
+            if (safeFileHandle == null)
+            {
+                return Helper.EmptyArray;
+            }
 
-            length = fsRead.Read(buffer.AsSpan(4));
-            length.ToBytes(buffer.AsSpan());
+            length = (uint)fsRead.Read(buffer.AsSpan(4));
+            ((ushort)(length + 2)).ToBytes(buffer.AsSpan());
+            buffer[2] = 0;
+            buffer[3] = 0;
             length += 4;
+
             return buffer;
 
         }
@@ -332,19 +345,8 @@ namespace linker.tun.device
 
             lock (writeLockObj)
             {
-                try
-                {
-                    fsWrite.Write(buffer.Span);
-                    fsWrite.Flush();
-                }
-                catch (Exception ex)
-                {
-                    if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
-                    {
-                        LoggerHelper.Instance.Error(ex.Message);
-                        LoggerHelper.Instance.Error(string.Join(",", buffer.ToArray()));
-                    }
-                }
+                fsWrite.Write(buffer.Span);
+                fsWrite.Flush();
                 return true;
             }
         }
@@ -355,10 +357,10 @@ namespace linker.tun.device
             return output;
         }
 
-        public async Task<bool> CheckAvailable(bool order = false)
+        public  Task<bool> CheckAvailable(bool order = false)
         {
             string output = CommandHelper.Linux(string.Empty, new string[] { $"ip link show {Name}" });
-            return await Task.FromResult(output.Contains("state UP")).ConfigureAwait(false);
+            return  Task.FromResult(output.Contains("state UP"));
         }
     }
 }

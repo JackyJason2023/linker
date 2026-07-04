@@ -1,11 +1,11 @@
 <template>
-     <el-dialog v-model="state.show" :close-on-click-modal="false" center append-to=".app-wrap" :title="`设置[${state.machineName}]的权限`" width="580" top="1vh">
+     <el-dialog append-to=".app-wrap" v-model="state.show" :close-on-click-modal="false" center :title="$t('access.edit',[state.machineName])" width="580" top="1vh">
         <div>
             <Access :accesss="state.accesss" ref="accessDom"></Access>
         </div>
         <template #footer>
-            <el-button plain @click="state.show = false" :loading="state.loading">取消</el-button>
-            <el-button type="success" plain @click="handleSave" :loading="state.loading">确定保存</el-button>
+            <el-button plain @click="state.show = false" :loading="state.loading">{{$t('common.cancel')}}</el-button>
+            <el-button type="success" plain @click="handleSave" :loading="state.loading">{{$t('common.confirm')}}</el-button>
         </template>
     </el-dialog>
 </template>
@@ -14,12 +14,15 @@ import { setAccess } from '@/apis/access';
 import { ElMessage } from 'element-plus';
 import { reactive, ref, watch } from 'vue';
 import Access from './Access.vue'
+import { useI18n } from 'vue-i18n';
 
 export default {
     props: ['data','modelValue'],
     emits: ['change','update:modelValue'],
     components:{Access},
     setup(props, { emit }) {
+
+        const {t} = useI18n();
         const state = reactive({
             show: true,
             loading: false,
@@ -45,12 +48,12 @@ export default {
             }).then(() => {
                 state.loading = false;
                 state.show = false;
-                ElMessage.success('已操作！');
+                ElMessage.success(t('common.opered'));
                 emit('change')
             }).catch((err) => {
                 console.log(err);
                 state.loading = false;
-                ElMessage.error('操作失败！');
+                ElMessage.error(t('common.operFail'));
             });
         }
 

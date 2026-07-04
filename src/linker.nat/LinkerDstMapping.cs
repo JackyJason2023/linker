@@ -5,7 +5,6 @@ using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Net;
-using System.Net.Sockets;
 
 namespace linker.nat
 {
@@ -19,6 +18,8 @@ namespace linker.nat
         private uint[] masks = [];
         private readonly ConcurrentDictionary<uint, uint> natDic = new ConcurrentDictionary<uint, uint>();
 
+        private long natCount = 0;
+
         /// <summary>
         /// 设置映射目标
         /// </summary>
@@ -30,6 +31,7 @@ namespace linker.nat
                 mapDic = new Dictionary<uint, uint>().ToFrozenDictionary();
                 masks = [];
                 natDic.Clear();
+                Interlocked.Exchange(ref natCount, 0);
                 return;
             }
 
@@ -68,7 +70,7 @@ namespace linker.nat
         public unsafe void ToFakeDst(ReadOnlyMemory<byte> buffer)
         {
             //映射表不为空
-            if (natDic.IsEmpty) return;
+            if (natCount == 0) return;
 
             fixed (byte* ptr = buffer.Span)
             {
@@ -79,8 +81,6 @@ namespace linker.nat
                 if (natDic.TryGetValue(packet.SrcAddr, out uint fakeDist))
                 {
                     packet.SrcAddr = fakeDist;
-                    packet.IPChecksum = 0;
-                    packet.PayloadChecksum = 0;
                 }
             }
 
@@ -110,11 +110,10 @@ namespace linker.nat
                         if (packet.DstAddr != realDist)
                         {
                             packet.DstAddr = realDist;
-                            packet.IPChecksum = 0;
-                            packet.PayloadChecksum = 0;
                             if (natDic.TryGetValue(realDist, out uint value) == false || value != fakeDist)
                             {
                                 natDic.AddOrUpdate(realDist, fakeDist, (a, b) => fakeDist);
+                                Interlocked.Add(ref natCount, 1);
                             }
                         }
                         break;
@@ -146,24 +145,7 @@ namespace linker.nat
         {
             private readonly byte* ptr;
 
-            /// <summary>
-            /// 协议版本
-            /// </summary>
             public readonly byte Version => (byte)((*ptr >> 4) & 0b1111);
-            public readonly ProtocolType Protocol => (ProtocolType)(*(ptr + 9));
-
-            /// <summary>
-            /// IP头长度
-            /// </summary>
-            public readonly int IPHeadLength => (*ptr & 0b1111) * 4;
-            /// <summary>
-            /// IP包荷载数据指针，也就是TCP/UDP头指针
-            /// </summary>
-            public readonly byte* PayloadPtr => ptr + IPHeadLength;
-
-            /// <summary>
-            /// 源地址
-            /// </summary>
             public readonly uint SrcAddr
             {
                 get
@@ -175,9 +157,6 @@ namespace linker.nat
                     *(uint*)(ptr + 12) = BinaryPrimitives.ReverseEndianness(value);
                 }
             }
-            /// <summary>
-            /// 目的地址
-            /// </summary>
             public readonly uint DstAddr
             {
                 get
@@ -191,50 +170,6 @@ namespace linker.nat
             }
             public ReadOnlySpan<byte> DstAddrSpan => new Span<byte>((ptr + 16), 4);
 
-            public readonly ushort IPChecksum
-            {
-                get
-                {
-                    return BinaryPrimitives.ReverseEndianness(*(ushort*)(ptr + 10));
-                }
-                set
-                {
-                    *(ushort*)(ptr + 10) = BinaryPrimitives.ReverseEndianness(value);
-                }
-            }
-            public readonly ushort PayloadChecksum
-            {
-                get
-                {
-                    return Protocol switch
-                    {
-                        ProtocolType.Icmp => BinaryPrimitives.ReverseEndianness(*(ushort*)(PayloadPtr + 2)),
-                        ProtocolType.Tcp => BinaryPrimitives.ReverseEndianness(*(ushort*)(PayloadPtr + 16)),
-                        ProtocolType.Udp => BinaryPrimitives.ReverseEndianness(*(ushort*)(PayloadPtr + 6)),
-                        _ => (ushort)0,
-                    };
-                }
-                set
-                {
-                    switch (Protocol)
-                    {
-                        case ProtocolType.Icmp:
-                            *(ushort*)(PayloadPtr + 2) = BinaryPrimitives.ReverseEndianness(value);
-                            break;
-                        case ProtocolType.Tcp:
-                            *(ushort*)(PayloadPtr + 16) = BinaryPrimitives.ReverseEndianness(value);
-                            break;
-                        case ProtocolType.Udp:
-                            *(ushort*)(PayloadPtr + 6) = BinaryPrimitives.ReverseEndianness(value);
-                            break;
-                    }
-                }
-            }
-
-            /// <summary>
-            /// 加载TCP/IP包，必须是一个完整的TCP/IP包
-            /// </summary>
-            /// <param name="ptr">一个完整的TCP/IP包</param>
             public MapPacket(byte* ptr)
             {
                 this.ptr = ptr;

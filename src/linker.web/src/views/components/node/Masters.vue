@@ -5,7 +5,7 @@
         </div>
         <el-table :data="state.request.List" stripe border size="small" width="100%">
             <el-table-column prop="Addr" label="IP"></el-table-column>
-            <el-table-column prop="Oper" :label="$t('server.denyOper')" width="60">
+            <el-table-column prop="Oper" :label="$t('common.oper')" width="60">
                 <template #default="scope">
                     <el-button type="danger" size="small" @click="handleDeny(scope.row)">
                         <el-icon><Remove /></el-icon>
@@ -25,7 +25,7 @@
 
 <script>
 import {  relayMasters } from '@/apis/relay';
-import { sforwardMasters } from '@/apis/sforward';
+import { reverseMasters } from '@/apis/reverse';
 import {  onMounted, reactive } from 'vue';
 import { Remove,Search } from '@element-plus/icons-vue';
 import Add from './Add.vue';
@@ -34,7 +34,7 @@ export default {
     components:{Remove,Search,Add},
     setup (props,{emit}) {
 
-        const getDataFn = props.type == 'relay' ? relayMasters : sforwardMasters;
+        const getDataFn = props.type == 'relay' ? relayMasters : reverseMasters;
         const state = reactive({
             request:{
                 NodeId:props.data.NodeId,

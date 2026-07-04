@@ -1,4 +1,5 @@
-﻿using linker.tunnel.transport;
+﻿using linker.fec;
+using linker.tunnel.transport;
 using System.Net;
 
 namespace linker.messenger.tunnel
@@ -21,7 +22,16 @@ namespace linker.messenger.tunnel
         public int PortMapLan { get; set; }
         public TunnelNetInfo Net { get; set; } = new TunnelNetInfo();
         public IPAddress InIp { get; set; } = IPAddress.Any;
+        public TunnelMeshInfo Mesh { get; set; } = new TunnelMeshInfo();
     }
+
+    public sealed partial class TunnelMeshInfo
+    {
+        public bool Enabled { get; set; }
+        public int Bandwidth { get; set; }
+        public string MachineName { get; set; }
+    }
+
 
     public sealed partial class TunnelLocalNetworkInfo
     {
@@ -47,7 +57,7 @@ namespace linker.messenger.tunnel
         public double Lat { get; set; }
         public double Lon { get; set; }
         public string Isp { get; set; } = string.Empty;
-        public string Nat { get; set; } = string.Empty;
+        public string Nat { get; set; } = "Unknown/Unknown/IPV4-0";
     }
 
     public sealed partial class TunnelSetRouteLevelInfo
@@ -57,6 +67,7 @@ namespace linker.messenger.tunnel
         public int PortMapWan { get; set; }
         public int PortMapLan { get; set; }
         public IPAddress InIp { get; set; } = IPAddress.Any;
+        public TunnelMeshInfo Mesh { get; set; } = new TunnelMeshInfo();
     }
 
     public sealed class TunnelPublicNetworkInfo

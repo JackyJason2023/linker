@@ -1,13 +1,13 @@
 <template>
-    <el-dialog v-model="state.show" :close-on-click-modal="false" append-to=".app-wrap" title="计划任务" top="2vh" width="450">
+    <el-dialog append-to=".app-wrap" v-model="state.show" :close-on-click-modal="false" :title="$t('plan')" top="2vh" width="450">
        <div>
            <el-form ref="ruleFormRef" :model="state.ruleForm" :rules="state.rules" label-width="auto">
-                <el-form-item label="执行操作" prop="Handle">
+                <el-form-item :label="$t('plan.action')" prop="Handle">
                     <el-select v-model="state.ruleForm.Handle"  disabled>
                         <el-option v-for="(item,index) in plan.handles" :value="item.value" :label="item.label"></el-option>
                     </el-select>
                 </el-form-item>  
-                <el-form-item label="执行方式" prop="Method">
+                <el-form-item :label="$t('plan.method')" prop="Method">
                     <el-select v-model="state.ruleForm.Method"  @change="handleChange">
                         <el-option v-for="(item,index) in plan.methods" :value="item.value" :label="item.label"></el-option>
                     </el-select>
@@ -15,76 +15,76 @@
                         {{ state.ruleForm.Rule }}
                     </strong>
                 </el-form-item>
-                <el-form-item label="在" prop="Rule" v-if="state.ruleForm.Method == 2">
+                <el-form-item :label="$t('plan.on')" prop="Rule" v-if="state.ruleForm.Method == 2">
                     <div class="w-100">
                         <el-select v-model="state.ruleAt.type"  @change="handleChange">
-                            <el-option :value="2" label="每月"></el-option>
-                            <el-option :value="3" label="每日"></el-option>
-                            <el-option :value="4" label="每时"></el-option>
-                            <el-option :value="5" label="每分"></el-option>
-                        </el-select>  <span>的</span>
+                            <el-option :value="2" :label="$t('plan.anym')"></el-option>
+                            <el-option :value="3" :label="$t('plan.anyd')"></el-option>
+                            <el-option :value="4" :label="$t('plan.anyh')"></el-option>
+                            <el-option :value="5" :label="$t('plan.anymm')"></el-option>
+                        </el-select>
                     </div>
                     <div class="w-100 mgt-1">
-                        <el-input v-trim @change="handleChange" v-if="state.ruleAt.type < 2" v-model="state.ruleAt.month" ><template #append>月</template></el-input>
-                        <el-input v-trim @change="handleChange" v-if="state.ruleAt.type < 3" :class="{'mgl-1':state.ruleAt.type < 2}" v-model="state.ruleAt.day" ><template #append>日</template></el-input>
-                        <el-input v-trim @change="handleChange" v-if="state.ruleAt.type < 4" :class="{'mgl-1':state.ruleAt.type < 3}" v-model="state.ruleAt.hour" ><template #append>时</template></el-input>
-                        <el-input v-trim @change="handleChange" v-if="state.ruleAt.type < 5" :class="{'mgl-1':state.ruleAt.type < 4}" v-model="state.ruleAt.min" ><template #append>分</template></el-input>
-                        <el-input v-trim @change="handleChange" :class="{'mgl-1':state.ruleAt.type < 5}" v-model="state.ruleAt.sec" ><template #append>秒</template></el-input>
+                        <el-input v-trim @change="handleChange" v-if="state.ruleAt.type < 2" v-model="state.ruleAt.month" ><template #append>{{ $t('plan.m') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-if="state.ruleAt.type < 3" v-model="state.ruleAt.day" ><template #append>{{ $t('plan.d') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-if="state.ruleAt.type < 4" v-model="state.ruleAt.hour" ><template #append>{{ $t('plan.h') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-if="state.ruleAt.type < 5" v-model="state.ruleAt.min" ><template #append>{{ $t('plan.mm') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleAt.sec" ><template #append>{{ $t('plan.s') }}</template></el-input>
                     </div>
                 </el-form-item>
-                <el-form-item label="每" prop="Rule" v-if="state.ruleForm.Method == 4">
+                <el-form-item :label="$t('plan.any')" prop="Rule" v-if="state.ruleForm.Method == 4">
                     <div class="w-100">
-                        <el-input v-trim @change="handleChange" v-model="state.ruleTimer.year" ><template #append>年</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleTimer.month" ><template #append>月</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleTimer.day" ><template #append>日</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTimer.year" ><template #append>{{ $t('plan.y') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTimer.month" ><template #append>{{ $t('plan.m') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTimer.day" ><template #append>{{ $t('plan.d') }}</template></el-input>
                     </div>
                     <div class="w-100 mgt-1">
-                        <el-input v-trim @change="handleChange" v-model="state.ruleTimer.hour" ><template #append>时</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleTimer.min" ><template #append>分</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleTimer.sec" ><template #append>秒</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTimer.hour" ><template #append>{{ $t('plan.h') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTimer.min" ><template #append>{{ $t('plan.mm') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTimer.sec" ><template #append>{{ $t('plan.s') }}</template></el-input>
                     </div>
                 </el-form-item>
                 <el-form-item label="Cron" prop="Rule" v-if="state.ruleForm.Method == 8">
                     <div class="w-100">
-                        <el-input v-trim @change="handleChange" v-model="state.ruleCron.sec" ><template #append>秒</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleCron.min" ><template #append>分</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleCron.hour" ><template #append>时</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleCron.sec" ><template #append>{{ $t('plan.s') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleCron.min" ><template #append>{{ $t('plan.mm') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleCron.hour" ><template #append>{{ $t('plan.h') }}</template></el-input>
                     </div>
                     <div class="w-100 mgt-1">
-                        <el-input v-trim @change="handleChange" v-model="state.ruleCron.day" ><template #append>日</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleCron.month" ><template #append>月</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleCron.week" ><template #append>周</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleCron.day" ><template #append>{{ $t('plan.d') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleCron.month" ><template #append>{{ $t('plan.m') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleCron.week" ><template #append>{{ $t('plan.w') }}</template></el-input>
                     </div>
                 </el-form-item>
-                <el-form-item label="在" prop="Rule" v-if="state.ruleForm.Method == 16">
+                <el-form-item :label="$t('plan.on')" prop="Rule" v-if="state.ruleForm.Method == 16">
                     <div class="w-100">
                         <el-select v-model="state.ruleForm.TriggerHandle"  @change="handleChange">
                             <el-option v-for="(item,index) in plan.triggers" :value="item.value" :label="item.label"></el-option>
-                        </el-select> <span>的</span>
+                        </el-select>
                     </div>
                     <div class="mgt-1 w-100">
-                        <el-input v-trim @change="handleChange" v-model="state.ruleTrigger.year" ><template #append>年</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleTrigger.month" ><template #append>月</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleTrigger.day" ><template #append>日</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTrigger.year" ><template #append>{{ $t('plan.y') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTrigger.month" ><template #append>{{ $t('plan.m') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTrigger.day" ><template #append>{{ $t('plan.d') }}</template></el-input>
                     </div>
                     <div class="mgt-1 w-100">
-                        <el-input v-trim @change="handleChange" v-model="state.ruleTrigger.hour" ><template #append>时</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleTrigger.min" ><template #append>分</template></el-input>
-                        <el-input v-trim @change="handleChange" class="mgl-1" v-model="state.ruleTrigger.sec" ><template #append>秒</template></el-input>
-                        <span>后</span>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTrigger.hour" ><template #append>{{ $t('plan.h') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTrigger.min" ><template #append>{{ $t('plan.mm') }}</template></el-input>
+                        <el-input v-trim @change="handleChange" v-model="state.ruleTrigger.sec" ><template #append>{{ $t('plan.s') }}</template></el-input>
+                        <span>{{ $t('plan.after') }}</span>
                     </div>
                 </el-form-item> 
-                <el-form-item label="内容" prop="Value">
+                <el-form-item :label="$t('plan.cont')" prop="Value">
                     <el-input v-trim type="textarea" resize="none" rows="5" v-model="state.ruleForm.Value"></el-input>
                 </el-form-item>
-                <el-form-item label="禁用" prop="Disabled">
+                <el-form-item :label="$t('plan.disabled')" prop="Disabled">
                     <el-switch v-model="state.ruleForm.Disabled" />
                 </el-form-item>
 
                 <el-form-item label="" prop="Btns">
                    <div class="t-c w-100">
-                       <el-button @click="state.show = false">取消</el-button>
-                       <el-button type="primary" @click="handleSave" :loading="state.loading">确认</el-button>
+                       <el-button @click="state.show = false">{{$t('common.cancel')}}</el-button>
+                       <el-button type="primary" @click="handleSave" :loading="state.loading">{{$t('common.confirm')}}</el-button>
                    </div>
                 </el-form-item>
            </el-form>
@@ -284,5 +284,5 @@ export default {
 </script>
 <style lang="stylus" scoped>
 .el-select{width:10rem;}
-.el-input{width:8rem;}
+.el-input{width:14rem;}
 </style>

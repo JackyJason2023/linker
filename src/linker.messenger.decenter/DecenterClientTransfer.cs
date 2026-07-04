@@ -6,9 +6,9 @@ namespace linker.messenger.decenter
 {
     public sealed class DecenterClientTransfer
     {
-        private StringChangedManager stringChangedManager = new StringChangedManager();
-        private VersionMultipleManager versionMultipleManager = new VersionMultipleManager();
-        private OperatingMultipleManager operatingMultipleManager = new OperatingMultipleManager();
+        private readonly StringChangedManager stringChangedManager = new StringChangedManager();
+        private readonly VersionMultipleManager versionMultipleManager = new VersionMultipleManager();
+        private readonly OperatingMultipleManager operatingMultipleManager = new OperatingMultipleManager();
 
         private List<IDecenter> decenters = new List<IDecenter>();
 
@@ -92,16 +92,12 @@ namespace linker.messenger.decenter
         {
             foreach (IDecenter item in decenters)
             {
-                if (operatingMultipleManager.StartOperation(item.Name))
+                if (versionMultipleManager.HasValueChange(item.Name))
                 {
-                    if (versionMultipleManager.HasValueChange(item.Name))
+                    operatingMultipleManager.StartOperation(item.Name, async () =>
                     {
-                        Task.Run(item.ProcData).ContinueWith((result) => { operatingMultipleManager.StopOperation(item.Name); });
-                    }
-                    else
-                    {
-                        operatingMultipleManager.StopOperation(item.Name);
-                    }
+                        item.ProcData();
+                    });
                 }
             }
         }
@@ -128,8 +124,8 @@ namespace linker.messenger.decenter
 
             await Task.WhenAll(updates.Select(c =>
             {
-                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
-                    LoggerHelper.Instance.Debug($"decenter push {c.Name}");
+                //if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                //    LoggerHelper.Instance.Debug($"decenter push {c.Name}");
 
                 return messengerSender.SendOnly(new MessageRequestWrap
                 {
@@ -141,6 +137,7 @@ namespace linker.messenger.decenter
 
             List<DecenterSyncTaskInfo> pullTasks = updates.Select(c =>
             {
+                //LoggerHelper.Instance.Debug($"decenter pull {c.Name}:{c.Count}:{c.Force}");
                 return new DecenterSyncTaskInfo
                 {
                     Decenter = c,
@@ -157,8 +154,8 @@ namespace linker.messenger.decenter
             MessageResponeInfo[] pulls = await Task.WhenAll(pullTasks.Select(c => c.Task)).ConfigureAwait(false);
             foreach (var task in pullTasks.Where(c => c.Task.Result.Code == MessageResponeCodes.OK && c.Task.Result.Data.Span.SequenceEqual(Helper.FalseArray) == false))
             {
-                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
-                    LoggerHelper.Instance.Debug($"decenter pull {task.Decenter.Name}->{task.Task.Result.Data.Length}");
+                //if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                //    LoggerHelper.Instance.Debug($"decenter pull {task.Decenter.Name}->{task.Task.Result.Data.Length}");
                 List<ReadOnlyMemory<byte>> list = serializer.Deserialize<List<ReadOnlyMemory<byte>>>(task.Task.Result.Data.Span);
                 task.Decenter.AddData(list);
                 task.Decenter.DataVersion.Increment();
@@ -213,6 +210,7 @@ namespace linker.messenger.decenter
                 {
                     item.PushVersion.Increment();
                 }
+                return Task.CompletedTask;
             };
         }
 

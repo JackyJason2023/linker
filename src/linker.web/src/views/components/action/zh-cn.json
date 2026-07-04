@@ -1,0 +1,5 @@
+{
+    "action.text": "设置定义验证的静态Json参数",
+    "action.jsonError": "json格式错误",
+    "action.title": "{0}的验证参数"
+}

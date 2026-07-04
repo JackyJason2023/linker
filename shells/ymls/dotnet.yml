@@ -8,7 +8,7 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: get current date
         id: date
         run: echo "::set-output name=today::$(date +'%Y-%m-%d')"
@@ -24,11 +24,11 @@ jobs:
           prerelease: false
           body: ""
       - name: setup node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: 'lts/*'
       - name: setup dotnet
-        uses: actions/setup-dotnet@v2
+        uses: actions/setup-dotnet@v4
         env:
           GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
         with:

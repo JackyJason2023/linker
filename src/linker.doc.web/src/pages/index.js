@@ -34,7 +34,7 @@ function HomepageHeader() {
                     </Link>
                     <Link
                         className="button button--secondary button--lg button--outline"
-                        to="https://afdian.com/a/snltty" style={{ marginLeft: '10px',color:'#fff'} }>
+                        to="https://ifdian.net/a/snltty" style={{ marginLeft: '10px',color:'#fff'} }>
                         捐助
                     </Link>
                 </div>
@@ -48,7 +48,7 @@ export default function Home() {
     return (
         <Layout
             title={`${siteConfig.title}`}
-            description="linker、海内皆隔壁，天涯若比邻。">
+            description="自由哒。">
             <HomepageHeader />
             <main>
                 <HomepageFeatures />

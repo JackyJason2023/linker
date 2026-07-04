@@ -9,12 +9,14 @@
 <script>
 import { computed } from 'vue';
 import { useWlist } from './wlist';
+import { useI18n } from 'vue-i18n';
 
 export default {
     props: ['item','type'],
     setup (props) {
+        const {t} = useI18n();
         const wlistState = useWlist();
-        const text = {'Relay':'中继','SForward':'穿透'}[props.type];
+        const text = {'Relay':t('wlist.relay'),'Reverse':t('wlist.reverse')}[props.type];
         const choiceOnece = (json)=>{
             const arr = Object.keys(json).reduce((arr,curr)=>{
                 arr.push({ id:curr,value:json[curr] });
@@ -29,13 +31,13 @@ export default {
             return {
                 id:result.id,
                 value:result.value,
-                title:result.value < 0 ? `拒绝${text}` : result.value == 0 ? `允许无限速${text}` : `允许${result.value}Mbps限速${text}`,
+                title:result.value < 0 ? t('"wlist.deny',[text]): result.value == 0 ? t('wlist.allow',[text]) : t('wlist.limit',[`${text}、${result.value}Mbps`]),
                 img:result.value < 0 ? 'blist.svg':'wlist.svg'
             };
         }
 
         const wlist = computed(()=>props.item.hook_wlist === undefined || Object.keys(props.item.hook_wlist).length == 0
-        ? {id:0,value:0,title:`无${text}限制配置`,img:'wlist-none.svg'}
+        ? {id:0,value:0,title:t('wlist.none'),img:'wlist-none.svg'}
         : choiceOnece(props.item.hook_wlist));
 
         const handleWlist = ()=>{

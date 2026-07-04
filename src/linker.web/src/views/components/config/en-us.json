@@ -1,0 +1,27 @@
+{
+    "messenger": "Messenger Server",
+    "messenger.addr": "Messenger Server",
+    "messenger.alert": "ip:port or domain:port",
+    "messenger.super.key": "Server key",
+    "messenger.super.password": "Server Password",
+    "messenger.userid": "User Id",
+    "messenger.userid.alert": "Your unique identifier,used to unlock something.",
+
+    "export": "Export",
+    "export.alert": "Export the configuration to run elsewhere",
+    "export.signle": "Single",
+    "export.name": "Name",
+    "export.name.alert": "Please input device name",
+    "export.psswd": "Api Pwd",
+    "export.psswd.alert": "Please input api password",
+    "export.webport": "Web Port",
+    "export.webport.alert": "Please input web port",
+    "export.download": "Download",
+    "export.copy": "Copy",
+    "export.save": "Save",
+    "export.updater": "Update secretKey",
+    "export.server": "Messenger server",
+    "export.super": "Super key",
+    "export.group": "Group",
+    "export.tunnel": "Tunnel config"
+}

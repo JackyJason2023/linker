@@ -1,15 +1,15 @@
 <template>
     <div>
-        <el-dialog v-model="state.show" title="初始化配置" width="700" top="2vh">
+        <el-dialog append-to=".app-wrap" v-model="state.show" :title="$t('install.init')" width="80rem" top="2vh">
             <div>
                 <el-tabs type="border-card">
-                    <el-tab-pane label="手动输入">
+                    <el-tab-pane :label="$t('install.input')">
                         <Input></Input>
                     </el-tab-pane>
-                    <el-tab-pane label="粘贴配置">
+                    <el-tab-pane :label="$t('install.copy')">
                         <Copy></Copy>
                     </el-tab-pane>
-                    <el-tab-pane label="在线导入">
+                    <el-tab-pane :label="$t('install.import')">
                         <Save></Save>
                     </el-tab-pane>
                 </el-tabs>
@@ -20,9 +20,9 @@
 <script>
 import { injectGlobalData } from '@/provide';
 import { reactive} from 'vue';
-import Input from './Input.vue'
-import Copy from './Copy.vue'
-import Save from './Save.vue'
+import Input from '../../../components/install/Input.vue'
+import Copy from '../../../components/install/Copy.vue'
+import Save from '../../../components/install/Save.vue'
 export default {
     components: { Input,Copy,Save},
     setup(props) {

@@ -1,7 +1,7 @@
 <template>
-    <el-dropdown-item @click="handleStopwatch"><el-icon><Platform /></el-icon>{{$t('home.messenger')}}</el-dropdown-item>
+    <el-dropdown-item @click="handleStopwatch"><el-icon><Platform /></el-icon>{{$t('oper.messenger')}}</el-dropdown-item>
     <AccessShow value="Flow">
-        <el-dropdown-item @click="handleFlow"><el-icon><Histogram /></el-icon>{{$t('home.flowStatis')}}</el-dropdown-item>
+        <el-dropdown-item @click="handleFlow"><el-icon><Histogram /></el-icon>{{$t('oper.flow')}}</el-dropdown-item>
     </AccessShow>
 </template>
 

@@ -1,0 +1,15 @@
+{
+    "socks5":"Proxy",
+    "socks5.title":"Proxy for {0}",
+    "socks5.alert":"Proxy server",
+    "socks5.port":"Port",
+    "socks5.p2n.routeIp":"Route IP",
+    "socks5.p2n.routePrefix":"Prefix",
+    "socks5.p2n.dstIp":"Dst IP",
+    "socks5.p2n.dstPrefix":"Prefix",
+    "socks5.p2n.remark":"Remark",
+    "socks5.p2n.disabled":"Disable",
+    "socks5.show.clash":"Conflict",
+    "socks5.show.disabled":"Disabled",
+    "socks5.show.normal":"Normal"
+}

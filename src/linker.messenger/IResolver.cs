@@ -8,7 +8,7 @@ namespace linker.messenger
         /// <summary>
         /// 外网端口
         /// </summary>
-        External = 0,
+        Wan = 0,
         /// <summary>
         /// 信标
         /// </summary>
@@ -37,12 +37,17 @@ namespace linker.messenger
         /// <summary>
         /// 穿透节点报告
         /// </summary>
-        SForwardReport = 8,
+        ReverseReport = 8,
 
         /// <summary>
         /// 节点联机
         /// </summary>
         NodeConnection = 9,
+
+        /// <summary>
+        /// 检测NAT类型
+        /// </summary>
+        Stun = 10,
     }
     public interface IResolver
     {

@@ -1,7 +1,7 @@
 <template>
-    <el-dialog v-model="state.show" append-to=".app-wrap" :title="state.title" top="1vh" width="98%">
+    <el-dialog append-to=".app-wrap" v-model="state.show" :title="state.title" top="1vh" width="80rem">
         <div>
-            <Transport :machineId="state.machineId"></Transport>
+            <Transport :machineId="state.machineId" :machineName="state.machineName"></Transport>
         </div>
     </el-dialog>
 </template>
@@ -10,6 +10,7 @@ import { reactive, watch } from 'vue';
 import Transport from '../transport/Transport.vue'
 import { useTransport } from './transport';
 import { injectGlobalData } from '@/provide';
+import { useI18n } from 'vue-i18n';
 export default {
     props: ['modelValue'],
     emits: ['update:modelValue'],
@@ -18,6 +19,7 @@ export default {
     },
     setup(props, { emit }) {
 
+        const {t} = useI18n();
         const globalData = injectGlobalData();
         const transport = useTransport();
 
@@ -26,7 +28,8 @@ export default {
         const state = reactive({
             show: true,
             machineId: transport.value.device.id,
-            title:isSelf? `[${transport.value.device.name}]上的隧道协议` : `本机与[${transport.value.device.name}]之间的隧道协议`,
+            machineName: transport.value.device.name,
+            title:isSelf ? t('tunnel.title',[transport.value.device.name]): t('tunnel.title1',[transport.value.device.name]),
         });
         watch(() => state.show, (val) => {
             if (!val) {

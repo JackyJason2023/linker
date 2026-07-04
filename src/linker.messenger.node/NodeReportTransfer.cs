@@ -1,7 +1,6 @@
 ﻿using linker.libs;
 using linker.libs.extends;
 using linker.libs.timer;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 
@@ -497,59 +496,76 @@ namespace linker.messenger.node
             {
                 try
                 {
-                    var nodes = await nodeStore.GetAll();
-                    nodes = nodes.Where(c =>
-                    {
-                        return nodeConnectionTransfer.TryGet(ConnectionSideType.Node, c.NodeId, out ConnectionInfo connection) == false || connection == null || connection.Connection == null || connection.Connection.Connected == false;
-                    }).ToList();
-                    if (nodes.Count != 0)
-                    {
-                        var tasks = nodes.Select(async c =>
+                    List<TStore> nodes = (await nodeStore.GetAll()).Where(node => nodeConnectionTransfer.TryGet(ConnectionSideType.Node, node.NodeId, out ConnectionInfo _connection) == false || _connection.Connection == null || _connection.Connection.Connected == false).ToList();
+
+                    var tasks = nodes.Select(async node =>
                         {
-                            using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(5000));
-                            IPEndPoint remote = await NetworkHelper.GetEndPointAsync(c.Host, 1802).ConfigureAwait(false);
+                            try
+                            {
+                                if (nodeConnectionTransfer.TryGet(ConnectionSideType.Node, node.NodeId, out ConnectionInfo _connection))
+                                {
+                                    LoggerHelper.Instance.Debug($"{Name} node {node.Name} connected {_connection?.Connection?.Connected}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                LoggerHelper.Instance.Error(ex);
+                            }
+
+                            using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(2000));
+                            IPEndPoint remote = await NetworkHelper.GetEndPointAsync(node.Host, 1802).ConfigureAwait(false);
+                            LoggerHelper.Instance.Debug($"{Name} sign in to node {node.Name} {remote}");
                             Socket socket = new Socket(remote.Address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                             socket.KeepAlive();
                             try
                             {
-
                                 await socket.ConnectAsync(remote, cts.Token).ConfigureAwait(false);
-                                var connection = await messengerResolver.BeginReceiveClient(socket, true, (byte)ResolverType.NodeConnection, Helper.EmptyArray).ConfigureAwait(false);
+                                LoggerHelper.Instance.Debug($"{Name} sign in to node {node.Name} {remote} connect sucess");
+                                var connection = await messengerResolver.BeginReceiveClient(socket, (byte)ResolverType.NodeConnection).ConfigureAwait(false);
 
-                                connection.Id = c.NodeId;
+                                if (connection == null || connection.Connected == false)
+                                {
+                                    LoggerHelper.Instance.Debug($"{Name} sign in to node {node.Name} {remote} recv fail");
+                                    socket.SafeClose();
+                                    return;
+                                }
+
+                                LoggerHelper.Instance.Debug($"{Name} sign in to node {node.Name} {remote} recv success");
+
+                                connection.Id = node.NodeId;
                                 var resp = await messengerSender.SendReply(new MessageRequestWrap
                                 {
                                     Connection = connection,
                                     MessengerId = MessengerIdSignIn,
-                                    Payload = serializer.Serialize(new ValueTuple<string, string, string>(Config.NodeId, c.MasterKey, c.ShareKey)),
-                                    Timeout = 5000
+                                    Payload = serializer.Serialize(new ValueTuple<string, string, string>(Config.NodeId, node.MasterKey, node.ShareKey)),
+                                    Timeout = 2000
                                 }).ConfigureAwait(false);
                                 if (resp.Code == MessageResponeCodes.OK && resp.Data.Span.SequenceEqual(Helper.TrueArray))
                                 {
-                                    LoggerHelper.Instance.Debug($"{Name} sign in to node {c.NodeId} success");
-                                    nodeConnectionTransfer.TryAdd(ConnectionSideType.Node, c.NodeId, new ConnectionInfo
+                                    LoggerHelper.Instance.Debug($"{Name} sign in to node {node.Name} success");
+                                    nodeConnectionTransfer.TryAdd(ConnectionSideType.Node, node.NodeId, new ConnectionInfo
                                     {
                                         Connection = connection,
-                                        Manageable = c.Manageable
+                                        Manageable = node.Manageable
                                     });
                                 }
                                 else
                                 {
-                                    LoggerHelper.Instance.Error($"{Name} sign in to node {c.NodeId} fail");
-                                    connection?.Disponse();
+                                    LoggerHelper.Instance.Error($"{Name} sign in to node {node.Name} {remote} fail");
+                                    connection?.Dispose();
                                 }
                             }
                             catch (Exception ex)
                             {
                                 if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                                 {
-                                    LoggerHelper.Instance.Error($"{Name} sign in : {ex}");
+                                    LoggerHelper.Instance.Error($"{Name} sign in to node {node.Name} {remote} : {ex}");
                                 }
                                 socket.SafeClose();
                             }
-                        });
-                        await Task.WhenAll(tasks).ConfigureAwait(false);
-                    }
+                        }).ToList();
+
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {

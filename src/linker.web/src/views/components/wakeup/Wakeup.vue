@@ -4,7 +4,7 @@
             <div class="flex">
                 <div class="flex mgt-1">
                     <div>
-                        <el-select v-model="state.search.Data.Type" @change="loadData" size="small" class="mgr-1" style="width: 9rem;">
+                        <el-select v-model="state.search.Data.Type" @change="loadData" size="small" class="mgr-1 w-9">
                             <el-option :value="item.value" :label="item.label" v-for="(item,index) in state.types"></el-option>
                         </el-select>
                     </div>
@@ -12,7 +12,7 @@
                 <div class="flex mgt-1">
                     <div>
                         <span>{{$t('wakeup.name')}}/{{$t('wakeup.value')}}/{{$t('wakeup.remark')}}</span>
-                        <el-input v-trim v-model="state.search.Data.Str" @change="loadData" size="small" style="width:7rem"></el-input>
+                        <el-input v-trim v-model="state.search.Data.Str" @change="loadData" size="small" class="w-7"></el-input>
                     </div>
                     <div class="mgl-1">
                         <el-button size="small" :loading="state.loading" @click="loadData">{{$t('common.refresh')}}</el-button>
@@ -58,7 +58,7 @@
                                 <a href="javascript:void(0);" class="a-line mgr-1" @click="handleAdd(scope.row)">{{$t('wakeup.edit')}}</a>
                                 <el-popconfirm 
                                 :confirm-button-text="$t('common.confirm')" :cancel-button-text="$t('common.cancel')"
-                                    :title="$t('wakeup.delConfirm')" @confirm="handleDel(scope.row)">
+                                    :title="$t('common.delSure',[''])" @confirm="handleDel(scope.row)">
                                     <template #reference>
                                         <a href="javascript:void(0);" class="a-line">{{$t('wakeup.del')}}</a>
                                     </template>
@@ -71,7 +71,7 @@
         </div>
     </div>
     <Add v-if="state.showAdd" v-model="state.showAdd" @success="loadData"></Add>
-    <el-dialog v-model="state.showSwitch" :title="`${$t('wakeup.runSwitchConfirm')}【${state.switchRow.Name}】？`" width="300">
+    <el-dialog append-to=".app-wrap" v-model="state.showSwitch" :title="`${$t('wakeup.runSwitchConfirm')}【${state.switchRow.Name}】？`" width="300">
         <div class="t-c">
             <div class="mgt-2"><el-button size="large" @click="handleSwitchMs(10000)">{{ $t('wakeup.runSwitchLong') }}10000ms</el-button></div>
             <div class="mgt-2"><el-button size="large" type="success" @click="handleSwitchMs(1000)">{{ $t('wakeup.runSwitchTouch') }}1000ms</el-button></div>
@@ -161,7 +161,7 @@ export default {
                     Ms:ms
                 }
             }).then(res => {
-                ElMessage.success(t('common.oper'));
+                ElMessage.success(t('common.opered'));
                 state.showSwitch = false;
             }).catch(() => {ElMessage.success(t('common.operFail'));});
         }
@@ -205,10 +205,9 @@ export default {
 }
 </script>
 <style lang="stylus" scoped>
-html.dark .head{border-color:#575c61;}
 .head {
     color:#555;
-    border:1px solid #eee;
+    border:1px solid var(--table-border-color);
     padding:0 1rem 1rem 1rem;
     border-bottom:0;
 }

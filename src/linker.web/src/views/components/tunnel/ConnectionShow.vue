@@ -1,5 +1,5 @@
 <template>
-   <div class="connect-point" @click="handleShow">
+   <div class="connect-point" @click="handleShow" v-if="row.isSelf == false">
         <span :class="`connect-point ${state.className}`" :title="state.title" v-loading="state.connecting"></span>
    </div>
 </template>
@@ -7,16 +7,23 @@
 <script>
 import {  computed, reactive } from 'vue';
 import { useConnections } from './connections';
+import { useI18n } from 'vue-i18n';
 export default {
     props: ['row','transactionId'],
     setup (props) {
+        const {t} = useI18n();
         const connections = useConnections();
         const connection = computed(()=>props.row.hook_connection?props.row.hook_connection[props.transactionId] || {} : {});
         const state = reactive({
             transactionId:props.transactionId,
-            connecting:computed(()=>props.row.hook_operating?props.row.hook_operating[props.transactionId]:false),
-            className:computed(()=>connection.value.Connected?['p2p','relay','node'][connection.value.Type]:'default'),
-            title:computed(()=>connection.value.Connected?['打洞直连','中继连接','节点连接'][connection.value.Type]:'未连接'),
+            connecting:computed(()=>{
+                if(props.row.hook_operating ){
+                    return (props.row.hook_operating[props.transactionId] || {loading:false}).loading;
+                }
+                return false;
+            }),
+            className:computed(()=>connection.value.Connected?['p2p','relay','mesh'][connection.value.Type]:'default'),
+            title:computed(()=>connection.value.Connected?[t('network.tunnel.p2p'),t('network.tunnel.relay'),t('network.tunnel.mesh')][connection.value.Type]:t('common.unknow')),
         });
         const handleShow = () => {
             connections.value.device = props.row;
@@ -50,8 +57,8 @@ span.connect-point {
     border-radius: 50%;
     display: inline-block;
     vertical-align: middle;
-    background-color: #eee;
-    border: 1px solid #ddd;
+    background-color: #f5f5f5;
+    border: 1px solid var(--table-border-color);
     cursor :pointer;
     transition:.3s;
     &:hover {
@@ -69,7 +76,7 @@ span.connect-point.relay {
     border: 1px solid #b3c410;
 }
 
-span.connect-point.node {
+span.connect-point.mesh {
     background-color: #09dda9;
     border: 1px solid #0cac90;
 }

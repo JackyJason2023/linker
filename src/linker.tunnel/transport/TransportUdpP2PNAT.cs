@@ -34,22 +34,26 @@ namespace linker.tunnel.transport
 
         public byte Order => 3;
 
+        public bool EnableAddr => true;
+
         /// <summary>
         /// 连接成功
         /// </summary>
-        public Action<ITunnelConnection> OnConnected { get; set; } = (state) => { };
+        public Action<ITunnelConnection, TunnelTransportInfo> OnConnected { get; set; } = (state, info) => { };
 
 
-        private readonly byte[] authBytes = Encoding.UTF8.GetBytes($"{Helper.GlobalString}.udp.ttl1");
-        private readonly byte[] endBytes = Encoding.UTF8.GetBytes($"{Helper.GlobalString}.udp.end1");
+        private readonly byte[] authBytes = Encoding.UTF8.GetBytes($"GET /snltty/tcp/index.html HTTP/1.1\r\nHost: www.snltty.com\r\nConnection: keep-alive\r\nTransfer-Encoding: chunked\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nCookie: {Helper.GlobalString}.udp.ttl1\r\n\r\n");
+        private readonly byte[] endBytes = Encoding.UTF8.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: keep-alive\r\nContent-Type: text/html\r\nCookie: {Helper.GlobalString}.udp.end1\r\n\r\nOK");
 
         private readonly ITunnelMessengerAdapter tunnelMessengerAdapter;
         public TransportUdpP2PNAT(ITunnelMessengerAdapter tunnelMessengerAdapter)
         {
             this.tunnelMessengerAdapter = tunnelMessengerAdapter;
         }
+        private X509Certificate certificate;
         public void SetSSL(X509Certificate certificate)
         {
+            this.certificate = certificate;
         }
 
         /// <summary>
@@ -82,7 +86,7 @@ namespace linker.tunnel.transport
             ITunnelConnection connection = await ConnectForward(tunnelTransportInfo, TunnelMode.Server).ConfigureAwait(false);
             if (connection != null)
             {
-                OnConnected(connection);
+                OnConnected(connection, tunnelTransportInfo);
                 await tunnelMessengerAdapter.SendConnectSuccess(tunnelTransportInfo).ConfigureAwait(false);
             }
             else
@@ -103,7 +107,7 @@ namespace linker.tunnel.transport
         {
             if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
             {
-                LoggerHelper.Instance.Warning($"{Name} connect to {tunnelTransportInfo.Remote.MachineId}->{tunnelTransportInfo.Remote.MachineName} {string.Join("\r\n", tunnelTransportInfo.RemoteEndPoints.Select(c => c.ToString()))}");
+                LoggerHelper.Instance.Warning($"{Name} connect to {tunnelTransportInfo.Remote.MachineId}->{tunnelTransportInfo.Remote.MachineName} {string.Join("\r\n", tunnelTransportInfo.RemoteEndPoints.FirstOrDefault())}");
             }
 
             using IMemoryOwner<byte> buffer = MemoryPool<byte>.Shared.Rent(1024);
@@ -117,27 +121,42 @@ namespace linker.tunnel.transport
 
             for (int i = 0; i < 5; i++)
             {
-                using CancellationTokenSource cts1 = new CancellationTokenSource(500);
                 try
                 {
-                    if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                   
+                    SocketReceiveFromResult result;
+                    try
                     {
-                        LoggerHelper.Instance.Warning($"{Name} connect to {tunnelTransportInfo.Remote.MachineId}->{tunnelTransportInfo.Remote.MachineName}");
+                        foreach (var item in tunnelTransportInfo.RemoteEndPoints.Where(c => c.AddressFamily == AddressFamily.InterNetwork))
+                        {
+                            targetSocket.SendTo(authBytes, item);
+                        }
+                        using CancellationTokenSource cts1 = new CancellationTokenSource(500);
+                        result = await targetSocket.ReceiveFromAsync(buffer.Memory, tempEP, cts1.Token).ConfigureAwait(false);
+                        targetSocket.SendTo(endBytes, result.RemoteEndPoint);
                     }
-
-                    foreach (var item in tunnelTransportInfo.RemoteEndPoints)
+                    catch (Exception)
                     {
-                        targetSocket.SendTo(authBytes, item);
+                        foreach (var item in tunnelTransportInfo.RemoteEndPoints.Where(c => c.AddressFamily == AddressFamily.InterNetworkV6))
+                        {
+                            targetSocket.SendTo(authBytes, item);
+                        }
+                        using CancellationTokenSource cts2 = new CancellationTokenSource(500);
+                        result = await targetSocket.ReceiveFromAsync(buffer.Memory, tempEP, cts2.Token).ConfigureAwait(false);
+                        targetSocket.SendTo(endBytes, result.RemoteEndPoint);
                     }
-                    var result = await targetSocket.ReceiveFromAsync(buffer.Memory, tempEP, cts1.Token).ConfigureAwait(false);
-                    targetSocket.SendTo(authBytes, result.RemoteEndPoint);
+                   
 
                     while (true)
                     {
                         using CancellationTokenSource cts = new CancellationTokenSource(1000);
                         try
                         {
-                            await targetSocket.ReceiveFromAsync(buffer.Memory, tempEP,cts.Token).ConfigureAwait(false);
+                            result = await targetSocket.ReceiveFromAsync(buffer.Memory, tempEP, cts.Token).ConfigureAwait(false);
+                            if(buffer.Memory.Span.Slice(0, result.ReceivedBytes).SequenceEqual(authBytes))
+                            {
+                                targetSocket.SendTo(endBytes, result.RemoteEndPoint);
+                            }
                         }
                         catch (Exception)
                         {
@@ -146,7 +165,7 @@ namespace linker.tunnel.transport
                     }
 
 
-                    ISymmetricCrypto crypto = mode == TunnelMode.Client ? CryptoFactory.CreateSymmetric(tunnelTransportInfo.Remote.MachineId) : CryptoFactory.CreateSymmetric(tunnelTransportInfo.Local.MachineId);
+                    ISymmetricCryptoGcm crypto = mode == TunnelMode.Client ? CryptoFactory.CreateSymmetricGcm(tunnelTransportInfo.Remote.MachineId) : CryptoFactory.CreateSymmetricGcm(tunnelTransportInfo.Local.MachineId);
                     return new TunnelConnectionUdp
                     {
                         UdpClient = targetSocket,
@@ -157,9 +176,9 @@ namespace linker.tunnel.transport
                         Type = TunnelType,
                         Mode = mode,
                         TransactionId = tunnelTransportInfo.TransactionId,
-                        TransactionTag = tunnelTransportInfo.TransactionTag,
+                        Configure = tunnelTransportInfo.Configure,
                         TransportName = tunnelTransportInfo.TransportName,
-                        IPEndPoint = NetworkHelper.TransEndpointFamily(result.RemoteEndPoint as IPEndPoint),
+                        IPEndPoint = (result.RemoteEndPoint as IPEndPoint).MapToIPv4(),
                         Label = string.Empty,
                         Receive = true,
                         SSL = tunnelTransportInfo.SSL,

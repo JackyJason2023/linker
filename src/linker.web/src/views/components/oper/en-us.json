@@ -1,0 +1,10 @@
+{
+    "oper.reboot": "Reboot",
+    "oper.access": "Access",
+    "oper.manageApi": "Manage Api",
+    "oper.passwd.new": "New Password",
+    "oper.passwd.set": "Set Password for {0}",
+    "oper.action": "Action",
+    "oper.messenger": "Messenger",
+    "oper.flow": "Flow"
+}

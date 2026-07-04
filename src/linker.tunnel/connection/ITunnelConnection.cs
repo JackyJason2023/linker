@@ -1,4 +1,5 @@
 ﻿using linker.libs;
+using linker.libs.extends;
 using System.Net;
 
 namespace linker.tunnel.connection
@@ -12,7 +13,6 @@ namespace linker.tunnel.connection
         None = 0,
         Tcp = 1,
         Udp = 2,
-        Quic = 4,
         All = 255
     }
     /// <summary>
@@ -30,7 +30,7 @@ namespace linker.tunnel.connection
     {
         P2P = 0,
         Relay = 1,
-        Node = 2,
+        Mesh = 2,
     }
     /// <summary>
     /// 隧道方向
@@ -56,41 +56,43 @@ namespace linker.tunnel.connection
         /// <param name="data"></param>
         /// <param name="state"></param>
         /// <returns></returns>
-        public Task Receive(ITunnelConnection connection, ReadOnlyMemory<byte> data, object state);
+        public ValueTask<bool> Receive(ITunnelConnection connection, ReadOnlyMemory<byte> data, object state);
         /// <summary>
         /// 收到隧道关闭
         /// </summary>
         /// <param name="connection"></param>
         /// <param name="state"></param>
         /// <returns></returns>
-        public Task Closed(ITunnelConnection connection, object state);
+        public ValueTask Closed(ITunnelConnection connection, object state);
+
+
     }
 
     /// <summary>
     /// 隧道连接对象
     /// </summary>
-    public interface ITunnelConnection:IDisposable
+    public interface ITunnelConnection
     {
         /// <summary>
         /// 对方id
         /// </summary>
-        public string RemoteMachineId { get; }
+        public string RemoteMachineId { get; set; }
         /// <summary>
         /// 对方名称
         /// </summary>
-        public string RemoteMachineName { get; }
+        public string RemoteMachineName { get; set; }
         /// <summary>
         /// 事务
         /// </summary>
-        public string TransactionId { get; }
+        public string TransactionId { get; set; }
         /// <summary>
-        /// 事务标签
+        /// 配置
         /// </summary>
-        public string TransactionTag { get; }
+        public Dictionary<string, string> Configure { get; }
         /// <summary>
         /// 协议
         /// </summary>
-        public string TransportName { get; }
+        public string TransportName { get; set; }
         /// <summary>
         /// 描述
         /// </summary>
@@ -102,7 +104,7 @@ namespace linker.tunnel.connection
         /// <summary>
         /// 隧道类型
         /// </summary>
-        public TunnelType Type { get; }
+        public TunnelType Type { get; set; }
 
         /// <summary>
         /// 中继节点ID
@@ -171,17 +173,14 @@ namespace linker.tunnel.connection
         /// </summary>
         public LastTicksManager LastTicks { get; }
 
-        /// <summary>
-        /// 缓冲区
-        /// </summary>
-        public byte[] PacketBuffer { get; set; }
+        public int HashCode { get; }
 
         /// <summary>
         /// 发送数据
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public Task<bool> SendAsync(ReadOnlyMemory<byte> data);
+        public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data);
         /// <summary>
         /// 发送数据
         /// </summary>
@@ -189,7 +188,7 @@ namespace linker.tunnel.connection
         /// <param name="offset"></param>
         /// <param name="length"></param>
         /// <returns></returns>
-        public Task<bool> SendAsync(byte[] buffer,int offset,int length);
+        public ValueTask<bool> SendAsync(byte[] buffer, int offset, int length);
         /// <summary>
         /// 开始接收数据
         /// </summary>
@@ -197,9 +196,88 @@ namespace linker.tunnel.connection
         /// <param name="userToken">自定义数据，回调带上</param>
         public void BeginReceive(ITunnelConnectionReceiveCallback callback, object userToken);
 
+        public void Dispose();
         public string ToString();
         public bool Equals(ITunnelConnection connection);
     }
 
+    public struct TunnelPacket
+    {
+        /// <summary>
+        /// 头里的长度值，是Payload的长度
+        /// </summary>
+        public ushort Length { get; private set; }
+        /// <summary>
+        /// 数据类型
+        /// </summary>
+        public byte Flag { get; private set; }
+        /// <summary>
+        /// 保留
+        /// </summary>
+        public byte Rsv { get; private set; }
 
+        /// <summary>
+        /// 长度(2字节) + 标志(1字节) + 保留(1字节) + 数据
+        /// </summary>
+        public ReadOnlyMemory<byte> RawData { get; private set; }
+        /// <summary>
+        /// 标志(1字节) + 保留(1字节) + 数据
+        /// </summary>
+        public ReadOnlyMemory<byte> Payload { get; private set; }
+        /// <summary>
+        /// 数据
+        /// </summary>
+        public ReadOnlyMemory<byte> PayloadData { get; private set; }
+
+
+        public const int PacketHeaderSize = PacketLengthSize + PacketFlagSize;
+        public const int PacketLengthSize = 2;
+        public const int PacketFlagSize = 2;
+
+        public const byte PacketFlagData = 0;
+        public const byte PacketFlagPing = 1;
+        public const byte PacketFlagPong = 2;
+        public const byte PacketFlagFin = 4;
+
+        public static int ReadLength(ReadOnlyMemory<byte> buffer) => buffer.ToUInt16();
+        public static void WriteLength(int length, ReadOnlyMemory<byte> buffer)
+        {
+            ((ushort)length).ToBytes(buffer);
+        }
+
+        public TunnelPacket(Memory<byte> dst, ReadOnlyMemory<byte> payloadData, byte flag, byte rsv = 0)
+        {
+            ((ushort)(payloadData.Length + PacketFlagSize)).ToBytes(dst);
+            dst.Span[2] = flag;
+            dst.Span[3] = rsv;
+            payloadData.CopyTo(dst.Slice(PacketHeaderSize));
+
+            RawData = dst.Slice(0, payloadData.Length + PacketHeaderSize);
+            Payload = dst.Slice(PacketLengthSize, payloadData.Length + PacketFlagSize);
+            PayloadData = dst.Slice(PacketHeaderSize, payloadData.Length);
+        }
+
+        public TunnelPacket(ReadOnlyMemory<byte> buffer, bool withLengthPrefix = true)
+        {
+            if (withLengthPrefix)
+            {
+                Length = buffer.ToUInt16();
+                Flag = buffer.Span[2];
+                Rsv = buffer.Span[3];
+                RawData = buffer;
+                Payload = buffer.Slice(PacketLengthSize);
+                PayloadData = buffer.Slice(PacketHeaderSize);
+            }
+            else
+            {
+                Flag = buffer.Span[0];
+                Rsv = buffer.Span[1];
+                RawData = buffer;
+                Payload = buffer;
+                PayloadData = buffer.Slice(PacketFlagSize);
+            }
+        }
+
+
+    }
 }

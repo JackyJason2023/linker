@@ -1,12 +1,13 @@
 ﻿using linker.libs;
 using linker.libs.extends;
 using System.Buffers;
-using System.Net.Security;
-using System.Net;
-using System.Text.Json.Serialization;
-using System.Text;
-using System.Net.Sockets;
+using System.Diagnostics;
 using System.IO.Pipelines;
+using System.Net;
+using System.Net.Security;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.Json.Serialization;
 
 namespace linker.tunnel.connection
 {
@@ -17,60 +18,51 @@ namespace linker.tunnel.connection
     {
         public TunnelConnectionTcp()
         {
+            HashCode = GetHashCode();
         }
 
-        public string RemoteMachineId { get; init; }
-        public string RemoteMachineName { get; init; }
-        public string TransactionId { get; init; }
-        public string TransactionTag { get; init; }
-        public string TransportName { get; init; }
+        public string RemoteMachineId { get; set; }
+        public string RemoteMachineName { get; set; }
+        public string TransactionId { get; set; }
+        public Dictionary<string, string> Configure { get; init; }
+        public string TransportName { get; set; }
         public string Label { get; init; }
         public TunnelMode Mode { get; init; }
-        public TunnelProtocolType ProtocolType { get; init; }
-        public TunnelType Type { get; init; }
+        public TunnelProtocolType ProtocolType { get; set; }
+        public TunnelType Type { get; set; }
         public string NodeId { get; init; }
         public TunnelDirection Direction { get; init; }
         public IPEndPoint IPEndPoint { get; init; }
         public bool SSL { get; init; }
         public byte BufferSize { get; init; } = 3;
-        public bool Connected => Socket != null && LastTicks.Expired(15000) == false;
+        public bool Connected => Socket != null && LastTicks.Expired(60000) == false;
         public int Delay { get; private set; }
-        public long SendBytes { get; private set; }
-        public long ReceiveBytes { get; private set; }
-
-        private long sendRemaining = 0;
-        public long SendBufferRemaining { get => sendRemaining; }
-        public long SendBufferFree { get => maxRemaining - sendRemaining; }
-        private const long maxRemaining = 128 * 1024;
-
-
-        private long recvRemaining = 0;
-        public long RecvBufferRemaining { get => recvRemaining; }
-        public long RecvBufferFree { get => maxRemaining - recvRemaining; }
 
         public LastTicksManager LastTicks { get; private set; } = new LastTicksManager();
 
-        [JsonIgnore]
-        public byte[] PacketBuffer { get; set; } = Helper.EmptyArray;
+        public int HashCode { get; private set; }
 
+        private const long maxRemaining = 128 * 1024;
+        private readonly StickyPacketCodec packetEncoder = new StickyPacketCodec(maxRemaining);
+        public long SendBytes => packetEncoder.SendBytes;
+        public long SendBufferRemaining => packetEncoder.SendBufferRemaining;
+        public long SendBufferFree => packetEncoder.SendBufferFree;
+        private readonly StickyPacketCodec packetDecoder = new StickyPacketCodec(maxRemaining);
+        public long ReceiveBytes => packetDecoder.SendBytes;
+        public long RecvBufferRemaining => packetDecoder.SendBufferRemaining;
+        public long RecvBufferFree => packetDecoder.SendBufferFree;
 
         [JsonIgnore]
         public SslStream Stream { get; init; }
-
         [JsonIgnore]
         public Socket Socket { get; init; }
-
 
         private ITunnelConnectionReceiveCallback callback;
         private CancellationTokenSource cts;
         private object userToken;
 
-        private readonly LastTicksManager pingTicks = new LastTicksManager();
-        private readonly byte[] pingBytes = Encoding.UTF8.GetBytes($"{Helper.GlobalString}.tcp.ping");
-        private readonly byte[] pongBytes = Encoding.UTF8.GetBytes($"{Helper.GlobalString}.tcp.pong");
+        private readonly LastTicksManager pingPongTicks = new LastTicksManager();
 
-        private Pipe pipeSender;
-        private Pipe pipeWriter;
         public void BeginReceive(ITunnelConnectionReceiveCallback callback, object userToken)
         {
             if (this.callback != null) return;
@@ -91,28 +83,27 @@ namespace linker.tunnel.connection
         {
             try
             {
-                int length = 0;
-                while (cts.IsCancellationRequested == false)
+                if (Stream != null)
                 {
-                    if (Stream != null)
+                    while (cts.IsCancellationRequested == false)
                     {
-                        Memory<byte> memory = pipeWriter.Writer.GetMemory(8 * 1024);
-                        length = await Stream.ReadAsync(memory, cts.Token).ConfigureAwait(false);
+                        Memory<byte> memory = packetDecoder.GetMemory(8 * 1024);
+                        int length = await Stream.ReadAsync(memory, cts.Token).ConfigureAwait(false);
                         if (length == 0) break;
-                        Interlocked.Add(ref recvRemaining, length);
-                        pipeWriter.Writer.Advance(length);
-                        await pipeWriter.Writer.FlushAsync().ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        Memory<byte> memory = pipeWriter.Writer.GetMemory(8 * 1024);
-                        length = await Socket.ReceiveAsync(memory, SocketFlags.None, cts.Token).ConfigureAwait(false);
-                        if (length == 0) break;
-                        Interlocked.Add(ref recvRemaining, length);
-                        pipeWriter.Writer.Advance(length);
-                        await pipeWriter.Writer.FlushAsync().ConfigureAwait(false);
+                        await packetDecoder.FlushAsync(length, cts.Token).ConfigureAwait(false);
                     }
                 }
+                else
+                {
+                    while (cts.IsCancellationRequested == false)
+                    {
+                        Memory<byte> memory = packetDecoder.GetMemory(8 * 1024);
+                        int length = await Socket.ReceiveAsync(memory, SocketFlags.None, cts.Token).ConfigureAwait(false);
+                        if (length == 0) break;
+                        await packetDecoder.FlushAsync(length, cts.Token).ConfigureAwait(false);
+                    }
+                }
+
             }
             catch (Exception ex)
             {
@@ -128,62 +119,36 @@ namespace linker.tunnel.connection
         }
         private async Task Recver()
         {
-            pipeWriter = new Pipe(new PipeOptions(pauseWriterThreshold: maxRemaining, resumeWriterThreshold: (maxRemaining / 2), useSynchronizationContext: false, minimumSegmentSize: 8192));
-            IMemoryOwner<byte> packetBuffer = MemoryPool<byte>.Shared.Rent(4 * 1024);
-
             try
             {
                 while (cts.IsCancellationRequested == false)
                 {
-                    ReadResult result = await pipeWriter.Reader.ReadAsync(cts.Token).ConfigureAwait(false);
-                    if (result.IsCompleted && result.Buffer.IsEmpty)
+                    ReadOnlyMemory<byte> memory = await packetDecoder.ReadPacketsAsync(cts.Token).ConfigureAwait(false);
+                    if (memory.IsEmpty)
                     {
-                        cts.Cancel();
-                        break;
+                        if (packetDecoder.IsCompleted)
+                        {
+                            cts.Cancel();
+                            break;
+                        }
+                        continue;
                     }
-
-                    ReadOnlySequence<byte> buffer = result.Buffer;
-                    ReceiveBytes += buffer.Length;
-                    long offset = 0;
-
+                    int length = memory.Length;
                     do
                     {
-                        //读取包长度
-                        int packetLength = 0;
-                        if (buffer.First.Length >= 4)
+                        try
                         {
-                            packetLength = buffer.First.ToInt32();
+                            int packetLength = packetDecoder.ReadLength(memory);
+                            await ProcessPacket(memory.Slice(StickyPacketCodec.PacketLengthSize, packetLength)).ConfigureAwait(false);
+                            memory = memory.Slice(StickyPacketCodec.PacketLengthSize + packetLength);
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            //长度标识跨段了
-                            buffer.Slice(0, 4).CopyTo(packetBuffer.Memory.Span);
-                            packetLength = packetBuffer.Memory.ToInt32();
+                            LoggerHelper.Instance.Error($"TCP process packet error:{ex}");
+                            break;
                         }
-                        //数据量不够
-                        if (packetLength + 4 > buffer.Length) break;
 
-                        //复制一份
-                        ReadOnlySequence<byte> temp = buffer.Slice(4, packetLength);
-                        if (packetBuffer.Memory.Length < temp.Length)
-                        {
-                            packetBuffer.Dispose();
-                            packetBuffer = MemoryPool<byte>.Shared.Rent((int)temp.Length);
-                        }
-                        temp.CopyTo(packetBuffer.Memory.Span);
-                        //处理数据包
-                        await WritePacket(packetBuffer.Memory.Slice(0, packetLength)).ConfigureAwait(false);
-                        Interlocked.Add(ref recvRemaining, -(packetLength + 4));
-
-                        //移动位置
-                        offset += 4 + packetLength;
-                        //去掉已处理部分
-                        buffer = buffer.Slice(4 + packetLength);
-
-                    } while (buffer.Length > 4);
-
-                    //告诉管道已经处理了多少数据，检查了多少数据
-                    pipeWriter.Reader.AdvanceTo(result.Buffer.GetPosition(offset), result.Buffer.End);
+                    } while (memory.Length > 0);
                 }
             }
             catch (Exception ex)
@@ -194,36 +159,23 @@ namespace linker.tunnel.connection
                 }
                 Dispose();
             }
-
-            packetBuffer.Dispose();
         }
-        private async Task WritePacket(ReadOnlyMemory<byte> packet)
+        private ValueTask<bool> ProcessPacket(ReadOnlyMemory<byte> memory)
         {
-
             LastTicks.Update();
-            if (packet.Length == pingBytes.Length && packet.Span.Slice(0, pingBytes.Length - 4).SequenceEqual(pingBytes.AsSpan(0, pingBytes.Length - 4)))
+            TunnelPacket packet = new TunnelPacket(memory, false);
+            return packet.Flag switch
             {
-                if (packet.Span.SequenceEqual(pingBytes))
-                {
-                    await SendPingPong(pongBytes).ConfigureAwait(false);
-                    return;
-                }
-                else if (packet.Span.SequenceEqual(pongBytes))
-                {
-                    Delay = (int)pingTicks.Diff();
-                    return;
-                }
-            }
-            try
-            {
-                await callback.Receive(this, packet, this.userToken).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                LoggerHelper.Instance.Error(ex);
-                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
-                    LoggerHelper.Instance.Error(string.Join(",", packet.ToArray()));
-            }
+                TunnelPacket.PacketFlagData => callback.Receive(this, packet.PayloadData, this.userToken),
+                TunnelPacket.PacketFlagPing => SendPingPong(Encoding.UTF8.GetBytes($"{Guid.NewGuid()}"), TunnelPacket.PacketFlagPong),
+                TunnelPacket.PacketFlagPong => ProcessPong(),
+                _ => ValueTask.FromResult(true)
+            };
+        }
+        private ValueTask<bool> ProcessPong()
+        {
+            Delay = (int)pingPongTicks.Diff();
+            return ValueTask.FromResult(true);
         }
 
         private async Task ProcessHeart()
@@ -240,8 +192,8 @@ namespace linker.tunnel.connection
 
                     if (LastTicks.DiffGreater(3000))
                     {
-                        pingTicks.Update();
-                        await SendPingPong(pingBytes).ConfigureAwait(false);
+                        pingPongTicks.Update();
+                        await SendPingPong(Encoding.UTF8.GetBytes($"{Guid.NewGuid()}"), TunnelPacket.PacketFlagPing).ConfigureAwait(false);
 
                     }
                     await Task.Delay(3000).ConfigureAwait(false);
@@ -255,53 +207,53 @@ namespace linker.tunnel.connection
                 }
             }
         }
-        private async Task SendPingPong(byte[] data)
+        private async ValueTask<bool> SendPingPong(byte[] data, byte value)
         {
-            int length = 4 + data.Length;
+            byte[] heartData = ArrayPool<byte>.Shared.Rent(TunnelPacket.PacketHeaderSize + data.Length);
 
-            byte[] heartData = ArrayPool<byte>.Shared.Rent(length);
-            data.Length.ToBytes(heartData.AsSpan());
-            data.AsMemory().CopyTo(heartData.AsMemory(4));
-
-            await SendAsync(heartData.AsMemory(0, length));
+            TunnelPacket packet = new TunnelPacket(heartData, data, value, 0);
+            await SendAsync(packet.RawData).ConfigureAwait(false);
 
             ArrayPool<byte>.Shared.Return(heartData);
+
+            return true;
         }
 
         private async Task Sender()
         {
-            pipeSender = new Pipe(new PipeOptions(pauseWriterThreshold: maxRemaining, resumeWriterThreshold: (maxRemaining / 2), useSynchronizationContext: false, minimumSegmentSize: 8192));
             try
             {
                 while (cts.IsCancellationRequested == false)
                 {
-                    ReadResult result = await pipeSender.Reader.ReadAsync().ConfigureAwait(false);
-                    if (result.IsCompleted && result.Buffer.IsEmpty)
-                    {
-                        cts.Cancel();
-                        break;
-                    }
+
+                    ReadResult result = await packetEncoder.ReadAsync(cts.Token).ConfigureAwait(false);
                     if (result.Buffer.IsEmpty)
                     {
+                        if (packetEncoder.IsCompleted)
+                        {
+                            cts.Cancel();
+                            break;
+                        }
                         continue;
                     }
-
-                    ReadOnlySequence<byte> buffer = result.Buffer;
-                    foreach (ReadOnlyMemory<byte> memoryBlock in result.Buffer)
+                    if (Stream != null)
                     {
-                        if (Stream != null)
+                        foreach (ReadOnlyMemory<byte> segment in result.Buffer)
                         {
-                            await Stream.WriteAsync(memoryBlock, cts.Token).ConfigureAwait(false);
+                            await Stream.WriteAsync(segment, cts.Token).ConfigureAwait(false);
+                            packetEncoder.Advance(segment.Length);
                         }
-                        else
-                        {
-                            await Socket.SendAsync(memoryBlock, SocketFlags.None, cts.Token).ConfigureAwait(false);
-                        }
-                        Interlocked.Add(ref sendRemaining, -memoryBlock.Length);
-                        SendBytes += memoryBlock.Length;
                     }
-                    pipeSender.Reader.AdvanceTo(buffer.End);
-                    LastTicks.Update();
+                    else
+                    {
+                        foreach (ReadOnlyMemory<byte> segment in result.Buffer)
+                        {
+                            await Socket.SendAllAsync(segment, cts.Token).ConfigureAwait(false);
+                            packetEncoder.Advance(segment.Length);
+                        }
+                    }
+
+                    packetEncoder.AdvanceTo(result.Buffer.End);
                 }
             }
             catch (Exception ex)
@@ -314,21 +266,33 @@ namespace linker.tunnel.connection
             }
 
         }
-
         private readonly SemaphoreSlim slm = new SemaphoreSlim(1);
-        public async Task<bool> SendAsync(ReadOnlyMemory<byte> data)
+        public async ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data)
         {
-            if (callback == null) return false;
+            if (cts.IsCancellationRequested || data.Length > 10 * 1024)
+            {
+                return false;
+            }
 
-            await slm.WaitAsync(cts.Token);
+            await slm.WaitAsync(cts.Token).ConfigureAwait(false);
             try
             {
-                FlushResult result = await pipeSender.Writer.WriteAsync(data).ConfigureAwait(false);
-                Interlocked.Add(ref sendRemaining, data.Length);
+                TunnelPacket packet = new TunnelPacket(data);
+                if (packet.Length != packet.Payload.Length)
+                {
+                    LoggerHelper.Instance.Error($"tcp tunnel data length mismatch {packet.Length} != {packet.Payload.Length}");
+                    return false;
+                }
+                await packetEncoder.WriteAsync(packet.RawData, cts.Token).ConfigureAwait(false);
                 return true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                {
+                    LoggerHelper.Instance.Error(ex);
+                }
+                Dispose();
             }
             finally
             {
@@ -337,23 +301,23 @@ namespace linker.tunnel.connection
 
             return false;
         }
-        public async Task<bool> SendAsync(byte[] buffer, int offset, int length)
+        public ValueTask<bool> SendAsync(byte[] buffer, int offset, int length)
         {
-            return await SendAsync(buffer.AsMemory(offset, length)).ConfigureAwait(false);
+            return SendAsync(buffer.AsMemory(offset, length));
         }
 
         public void Dispose()
         {
+            if (callback == null) return;
+
+            var _callback = callback;
+            callback = null;
+
             LastTicks.Clear();
             if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                 LoggerHelper.Instance.Error($"tunnel connection {this.GetHashCode()} writer offline {ToString()}");
 
-            callback?.Closed(this, userToken);
-            callback = null;
-            userToken = null;
             cts?.Cancel();
-
-            Interlocked.Exchange(ref sendRemaining, 0);
 
             Stream?.Close();
             Stream?.Dispose();
@@ -362,15 +326,15 @@ namespace linker.tunnel.connection
 
             try
             {
-                pipeSender?.Writer.Complete();
-                pipeSender?.Reader.Complete();
-
-                pipeWriter?.Writer.Complete();
-                pipeWriter?.Reader.Complete();
+                packetEncoder?.Dispose();
+                packetDecoder?.Dispose();
             }
             catch (Exception)
             { }
             GC.Collect();
+
+            _callback?.Closed(this, userToken);
+            userToken = null;
 
         }
         public override string ToString()

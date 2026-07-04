@@ -7,6 +7,8 @@ namespace linker.messenger.listen
         public int Port { get; }
         public int ApiPort { get; }
 
+        public bool Ipv6 { get; }
+
         public GeoRegistryInfo GeoRegistry { get; }
 
         public bool SetPort(int port);
@@ -19,14 +21,6 @@ namespace linker.messenger.listen
         public string Url { get; set; } = "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest";
         public string[] WhiteCountry { get; set; } = [];
         public string[] BlackCountry { get; set; } = [];
-
-        [JsonIgnore]
-        public byte[] Messengers { get; set; } = [
-            (byte)ResolverType.External,
-            (byte)ResolverType.Messenger,
-            (byte)ResolverType.Relay,
-            (byte)ResolverType.Socks4,
-            (byte)ResolverType.Socks5,
-        ];
+        public ushort[] BlackMessengers { get; set; } = [];
     }
 }

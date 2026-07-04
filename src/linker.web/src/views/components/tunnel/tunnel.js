@@ -11,6 +11,7 @@ export const provideTunnel = () => {
         hashcode1: 0,
 
         showEdit: false,
+        showUpnp: false,
         current: null,  
     });
     provide(tunnelSymbol, tunnel);
@@ -34,8 +35,16 @@ export const provideTunnel = () => {
         const json = {};
         for(let key in operatings){
             let arr = key.split('@');
-            json[arr[0]] = json[arr[0]] ||{};
-            json[arr[0]][arr[1]] = operatings[key];
+            const _json = {
+                [arr[0]]: {
+                    [arr[1]]: {
+                        [arr[2]]: operatings[key],
+                        loading: (json[arr[0]] && json[arr[0]][arr[1]] && json[arr[0]][arr[1]].loading) || operatings[key]
+                    }
+                }
+            };
+           
+            Object.assign(json,_json);
         }
         return json;
     }
@@ -71,13 +80,23 @@ export const provideTunnel = () => {
     
     const tunnelProcessFn = (device,json) => { 
         if(!tunnel.value.list || !tunnel.value.operatings) return;
-        
+        const value = tunnel.value.list[device.MachineId];
         Object.assign(json,{
-            hook_tunnel: tunnel.value.list[device.MachineId],
+            hook_tunnel: value,
             hook_tunnel_load:true,
             hook_operating: tunnel.value.operatings[device.MachineId],
             hook_operating_load: true,
         });
+        if(json.hook_tunnel && json.hook_tunnel.Net && json.hook_tunnel.Net.Nat){
+            const arr = json.hook_tunnel.Net.Nat.split('-');
+            const arr1 = arr[0].split('/');
+            json.hook_tunnel.Net.nat_number = parseInt(arr[1] || '0');
+            json.hook_tunnel.Net.nat_text = `RFC 5780\n映射类型 : ${arr1[0] || 'Unknown'}\n过滤类型 : ${arr1[1] || 'Unknown'}\n地址类型 : ${arr1[2]}\n成功几率 : ${json.hook_tunnel.Net.nat_number}%`;
+            json.hook_tunnel_sort = json.hook_tunnel.Net.nat_number;
+        }else{
+            json.hook_tunnel_sort = 1000;
+        }
+        
     }
     
     const sortTunnel = (asc) => {

@@ -1,0 +1,10 @@
+{
+    "logger.list": "列表",
+    "logger.setting": "设置",
+    "logger.clear": "清空",
+    "logger.refresh": "刷新",
+    "logger.count": "数量",
+    "logger.level": "等级",
+    "logger.time": "时间",
+    "logger.content": "内容"
+}

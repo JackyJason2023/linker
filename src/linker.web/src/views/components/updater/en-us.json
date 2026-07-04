@@ -1,0 +1,18 @@
+{
+    "updater":"Updater",
+    "updater.sync2Server": "Auto update to server version",
+    "updater.no": "No updates",
+    "updater.notnew": "Not latest version",
+    "updater.new": "Is latest version",
+    "updater.same": "Not same to server version",
+    "updater.downloading": "Downloading",
+    "updater.downloaded": "Downloaded",
+    "updater.unziping": "In unzip",
+    "updater.unzip": "Unzip",
+    "updater.close": "Are you sure to close server?",
+    "updater.latest": "Latest",
+    "updater.server": "Server version",
+    "updater.this.group": "This group",
+    "updater.this.server": "This server",
+    "updater.only": "Only"
+}

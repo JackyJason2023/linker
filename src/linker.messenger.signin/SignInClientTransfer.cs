@@ -172,11 +172,11 @@ namespace linker.messenger.signin
                 if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                     LoggerHelper.Instance.Info($"get server version:{clientSignInState.Version}");
 
-                clientSignInState.PushSignInSuccessBefore();
+                await clientSignInState.PushSignInSuccessBefore().ConfigureAwait(false);
                 if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                     LoggerHelper.Instance.Info($"push signin success before");
 
-                clientSignInState.PushSignInSuccess();
+                await clientSignInState.PushSignInSuccess().ConfigureAwait(false);
 
                 if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                     LoggerHelper.Instance.Info($"push signin success");
@@ -226,14 +226,14 @@ namespace linker.messenger.signin
         /// <returns></returns>
         private async Task<bool> SignIn2Server(string host, Socket socket)
         {
-            IConnection connection = await messengerResolver.BeginReceiveClient(socket, true, (byte)ResolverType.Messenger, Helper.EmptyArray).ConfigureAwait(false);
+            IConnection connection = await messengerResolver.BeginReceiveClient(socket, (byte)ResolverType.Messenger).ConfigureAwait(false);
 
             Dictionary<string, string> args = [];
             string argResult = await signInArgsTransfer.Invoke(host, args).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(argResult) == false)
             {
                 LoggerHelper.Instance.Error(argResult);
-                connection?.Disponse(6);
+                connection?.Dispose(6);
                 return false;
             }
 
@@ -253,7 +253,7 @@ namespace linker.messenger.signin
             if (resp.Code != MessageResponeCodes.OK)
             {
                 LoggerHelper.Instance.Error($"sign in fail : {resp.Code}");
-                connection?.Disponse(6);
+                connection?.Dispose(6);
                 return false;
             }
 
@@ -261,7 +261,7 @@ namespace linker.messenger.signin
             if (signResp.Status == false)
             {
                 LoggerHelper.Instance.Error($"sign in fail : {signResp.Msg}");
-                connection?.Disponse(6);
+                connection?.Dispose(6);
                 return false;
             }
             clientSignInState.Connection = connection;
@@ -278,7 +278,7 @@ namespace linker.messenger.signin
         public void SignOut()
         {
             if (clientSignInState.Connected)
-                clientSignInState.Connection.Disponse(5);
+                clientSignInState.Connection.Dispose(5);
         }
 
         /// <summary>

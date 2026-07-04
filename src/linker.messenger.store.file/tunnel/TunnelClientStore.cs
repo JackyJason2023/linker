@@ -1,5 +1,7 @@
 ﻿using linker.libs;
 using linker.messenger.tunnel;
+using linker.messenger.tunnel.client;
+using linker.tunnel;
 using linker.tunnel.transport;
 using System.Net;
 
@@ -16,7 +18,9 @@ namespace linker.messenger.store.file.tunnel
 
         public Action OnChanged { get; set; } = () => { };
 
-        public int TransportMachineIdCount => runningConfig.Data.Tunnel.Transports.Where(c => c.Value != null && c.Value.Count > 0).Count();
+        public int TransportMachineIdCount => runningConfig.Data.Tunnel.Transports.Count(c => c.Value != null && c.Value.Count > 0);
+
+        public TunnelMeshInfo Relay => runningConfig.Data.Tunnel.Mesh;
 
         private readonly RunningConfig runningConfig;
 
@@ -37,36 +41,40 @@ namespace linker.messenger.store.file.tunnel
         }
         public async Task<bool> SetTunnelTransports(string machineId, List<ITunnelTransport> list)
         {
-            if (string.IsNullOrWhiteSpace(machineId)) return false;
-
+            if (string.IsNullOrWhiteSpace(machineId))
+            {
+                return false;
+            }
             if (runningConfig.Data.Tunnel.Transports.TryGetValue(machineId, out List<TunnelTransportItemInfo> transportItems) == false)
             {
                 transportItems = new List<TunnelTransportItemInfo>();
             }
 
-            Rebuild(transportItems, list);
-            ForceUpdate(transportItems, list);
+            if (machineId == Helper.GlobalString)
+            {
+                foreach (var item in runningConfig.Data.Tunnel.Transports.Where(c => c.Value.Count > 0))
+                {
+                    Rebuild(item.Value, list);
+                }
+            }
 
+            Rebuild(transportItems, list);
             runningConfig.Data.Tunnel.Transports[machineId] = transportItems;
             runningConfig.Data.Update();
-
             OnChanged();
 
             return await Task.FromResult(true).ConfigureAwait(false);
         }
 
+
+        public async Task<List<string>> GetTunnelTransportMachineIds()
+        {
+            return await Task.FromResult(runningConfig.Data.Tunnel.Transports.Keys.ToList()).ConfigureAwait(false);
+        }
         public async Task<List<TunnelTransportItemInfo>> GetTunnelTransports(string machineId)
         {
             if (runningConfig.Data.Tunnel.Transports.TryGetValue(machineId, out List<TunnelTransportItemInfo> list) && list != null && list.Count > 0)
             {
-                if (runningConfig.Data.Tunnel.Transports.TryGetValue(Helper.GlobalString, out List<TunnelTransportItemInfo> defaults))
-                {
-                    if (Rebuild(list, defaults))
-                    {
-                        runningConfig.Data.Tunnel.Transports[machineId] = list;
-                        runningConfig.Data.Update();
-                    }
-                }
                 return list;
             }
             if (runningConfig.Data.Tunnel.Transports.TryGetValue(Helper.GlobalString, out list))
@@ -75,10 +83,24 @@ namespace linker.messenger.store.file.tunnel
             }
             return await Task.FromResult(new List<TunnelTransportItemInfo>()).ConfigureAwait(false);
         }
-
-        private void ForceUpdate(List<TunnelTransportItemInfo> currents, List<ITunnelTransport> news)
+        private bool Rebuild(List<TunnelTransportItemInfo> currents, List<ITunnelTransport> news)
         {
-            //强制更新一些信息
+            return Rebuild(currents, news.Select(c => new TunnelTransportItemInfo
+            {
+                Label = c.Label,
+                Name = c.Name,
+                ProtocolType = c.ProtocolType.ToString(),
+                Reverse = c.Reverse,
+                DisableReverse = c.DisableReverse,
+                SSL = c.SSL,
+                DisableSSL = c.DisableSSL,
+                Order = c.Order,
+                TunnelType = c.TunnelType,
+                EnableAddr = c.EnableAddr,
+            }).ToList());
+        }
+        private bool Rebuild(List<TunnelTransportItemInfo> currents, List<TunnelTransportItemInfo> news)
+        {
             foreach (var item in currents)
             {
                 var transport = news.FirstOrDefault(c => c.Name == item.Name);
@@ -89,6 +111,7 @@ namespace linker.messenger.store.file.tunnel
                     item.Name = transport.Name;
                     item.Label = transport.Label;
                     item.TunnelType = transport.TunnelType;
+                    item.EnableAddr = transport.EnableAddr;
                     if (transport.DisableReverse)
                     {
                         item.Reverse = transport.Reverse;
@@ -104,24 +127,6 @@ namespace linker.messenger.store.file.tunnel
                 }
             }
 
-        }
-        private bool Rebuild(List<TunnelTransportItemInfo> currents, List<ITunnelTransport> news)
-        {
-            return Rebuild(currents, news.Select(c => new TunnelTransportItemInfo
-            {
-                Label = c.Label,
-                Name = c.Name,
-                ProtocolType = c.ProtocolType.ToString(),
-                Reverse = c.Reverse,
-                DisableReverse = c.DisableReverse,
-                SSL = c.SSL,
-                DisableSSL = c.DisableSSL,
-                Order = c.Order,
-                TunnelType = c.TunnelType
-            }).ToList());
-        }
-        private bool Rebuild(List<TunnelTransportItemInfo> currents, List<TunnelTransportItemInfo> news)
-        {
             //有新的协议
             var newTransportNames = news.Select(c => c.Name).Except(currents.Select(c => c.Name));
             if (newTransportNames.Any())
@@ -140,6 +145,7 @@ namespace linker.messenger.store.file.tunnel
                     TunnelType = c.TunnelType
                 }));
             }
+
             //有已移除的协议
             var oldTransportNames = currents.Select(c => c.Name).Except(news.Select(c => c.Name));
             if (oldTransportNames.Any())
@@ -171,12 +177,32 @@ namespace linker.messenger.store.file.tunnel
         {
             runningConfig.Data.Update();
             OnChanged();
-            return false;
+            return await Task.FromResult(false).ConfigureAwait(false);
         }
 
         public async Task<bool> SetInIp(IPAddress ip)
         {
             runningConfig.Data.Tunnel.InIp = ip;
+            runningConfig.Data.Update();
+            OnChanged();
+            return await Task.FromResult(true).ConfigureAwait(false);
+        }
+
+        public async Task<bool> SetMesh(TunnelMeshInfo mesh)
+        {
+            runningConfig.Data.Tunnel.Mesh = mesh;
+            runningConfig.Data.Update();
+            OnChanged();
+            return await Task.FromResult(true).ConfigureAwait(false);
+        }
+
+        public async Task<List<PublicEndpointSample>> LoadRadarSamples()
+        {
+            return await Task.FromResult(runningConfig.Data.Tunnel.Samples).ConfigureAwait(false);
+        }
+        public async Task<bool> SaveRadarSamples(List<PublicEndpointSample> samples)
+        {
+            runningConfig.Data.Tunnel.Samples = samples;
             runningConfig.Data.Update();
             OnChanged();
             return await Task.FromResult(true).ConfigureAwait(false);

@@ -1,10 +1,10 @@
 <template>
-    <div class="home-list-wrap absolute flex flex-column flex-nowrap" >
+    <div class="home-list-wrap h-100 flex flex-column flex-nowrap" >
         <Sort @sort="handleSortChange"></Sort>
-        <el-table :data="devices.page.List" stripe border style="width: 100%" size="small" class="flex-1">
-            <Device  @refresh="handlePageRefresh"></Device>
+        <el-table :data="devices.page.List" border size="small" class="flex-1 w-100">
+            <Device  @refresh="handlePageRefresh" @search="handleSearchChange"></Device>
             <Tunnel  @refresh="deviceRefreshHook('tunnel')"></Tunnel>
-            <Tuntap></Tuntap>
+            <Tuntap @refresh="handlePageRefresh"></Tuntap>
             <Socks5  @refresh="deviceRefreshHook('socks5')"></Socks5> 
             <Forward ></Forward> 
             <Oper  @refresh="handlePageRefresh"></Oper>
@@ -22,12 +22,14 @@
         <DeviceEdit v-if="devices.showDeviceEdit" v-model="devices.showDeviceEdit"  @change="handlePageChange" :data="devices.deviceInfo"></DeviceEdit>
         <AccessEdit v-if="devices.showAccessEdit" v-model="devices.showAccessEdit"  @change="handlePageChange" :data="devices.deviceInfo"></AccessEdit>
         <TunnelEdit v-if="tunnel.showEdit" v-model="tunnel.showEdit"  @change="deviceRefreshHook('tunnel')"></TunnelEdit>
+        <TunnelUpnp v-if="tunnel.showUpnp" v-model="tunnel.showUpnp"></TunnelUpnp>
+        
         <ConnectionsEdit v-if="connections.showEdit" v-model="connections.showEdit" ></ConnectionsEdit>
         <TuntapEdit v-if="tuntap.showEdit" v-model="tuntap.showEdit"  @change="deviceRefreshHook('tuntap')"></TuntapEdit>
         <TuntapLease v-if="tuntap.showLease" v-model="tuntap.showLease"  @change="deviceRefreshHook('tuntap')"></TuntapLease>
         <Socks5Edit v-if="socks5.showEdit" v-model="socks5.showEdit"  @change="deviceRefreshHook('socks5')"></Socks5Edit>
         <ForwardEdit v-if="forward.showEdit" v-model="forward.showEdit" ></ForwardEdit>
-        <SForwardEdit v-if="sforward.showEdit" v-model="sforward.showEdit" ></SForwardEdit>
+        <ReverseEdit v-if="reverse.showEdit" v-model="reverse.showEdit" ></ReverseEdit>
         <UpdaterConfirm v-if="updater.show" v-model="updater.show" ></UpdaterConfirm>
         
         <OperFirewall v-if="firewall.show" v-model="firewall.show" ></OperFirewall>
@@ -58,6 +60,7 @@ import { provideSocks5 } from '../../../components/socks5/socks5'
 
 import Tunnel from '../../../components/tunnel/Tunnel.vue'
 import TunnelEdit from '../../../components/tunnel/TunnelEdit.vue'
+import TunnelUpnp from '../../../components/tunnel/TunnelUpnp.vue'
 import { provideTunnel } from '../../../components/tunnel/tunnel'
 
 import { provideUpdater } from '../../../components/updater/updater'
@@ -76,8 +79,8 @@ import { provideConnections } from '../../../components/tunnel/connections'
 import Forward from '../../../components/forward/Forward.vue'
 import ForwardEdit from '../../../components/forward/ForwardEdit.vue'
 import { provideForward } from '../../../components/forward/forward'
-import SForwardEdit from '../../../components/forward/SForwardEdit.vue'
-import { provideSforward } from '../../../components/forward/sforward'
+import ReverseEdit from '../../../components/forward/ReverseEdit.vue'
+import { provideReverse } from '../../../components/forward/reverse'
 
 import { provideFlow } from '../../../components/flow/flow'
 import Stopwatch from '../../../components/flow/stopwatch/Index.vue'
@@ -105,10 +108,10 @@ export default {
         AccessEdit,
         Tunnel,TunnelEdit,
         ConnectionsEdit,
-        Tuntap,TuntapEdit,TuntapLease,
+        Tuntap,TuntapEdit,TunnelUpnp,TuntapLease,
         Socks5, Socks5Edit,
         Forward,ForwardEdit,
-        SForwardEdit ,UpdaterConfirm,
+        ReverseEdit ,UpdaterConfirm,
         Stopwatch,
         Oper,OperFirewall,OperWakeup ,OperTransport,OperAction,OperFlow,OperWlist
     },
@@ -121,9 +124,10 @@ export default {
             paperLayout: computed(()=>globalData.value.isPc?'total,sizes,prev,pager, next':'prev, pager, next'),
         });
 
-        const {devices,deviceAddHook,deviceRefreshHook, deviceStartProcess, handlePageChange, handlePageSizeChange,deviceClearTimeout,setSort} = provideDevices();
+        const {devices,deviceAddHook,deviceRefreshHook, deviceStartProcess, handlePageChange,
+             handlePageSizeChange,deviceClearTimeout,handleSort,handleSearch} = provideDevices();
         const {forward} = provideForward();
-        const {sforward} = provideSforward();
+        const {reverse} = provideReverse();
         const {flow} = provideFlow();
         const {oper} = provideOper();
         const {firewall} = provideFirewall();
@@ -150,56 +154,32 @@ export default {
         
         
         const handleSortChange = (row)=>{
-
-            devices.page.Request.Prop = row.prop;
-            devices.page.Request.Asc = row.order == 'ascending';
-            
-            let fn = new Promise((resolve,reject)=>{
-                resolve();
-            });
-            if(row.prop == 'tunnel'){   
-                const ids = sortTunnel(devices.page.Request.Asc);
-                if(ids .length > 0){
-                    fn = setSort(ids);
-                }
-            }else if(row.prop == 'tuntap'){
-                const ids = sortTuntapIP(devices.page.Request.Asc);
-                if(ids .length > 0){
-                    fn = setSort(ids);
-                }
-            }else if(row.prop == 'socks5'){
-                const ids = sortSocks5(devices.page.Request.Asc);
-                if(ids .length > 0){
-                    fn = setSort(ids);
-                }
+            if(!row.order){
+                devices.page.Request.Prop = '';
+            }else{
+                devices.page.Request.Prop = row.prop;
+                devices.page.Request.Asc = row.order == 'ascending';
             }
-            fn.then(()=>{
-                handlePageChange();
-            }).catch(()=>{});
-            
+            handleSort();
+        }
+        const handleSearchChange = ()=>{
+            handleSearch();
         }
 
-        const handlePageRefresh = (name)=>{
-            devices.page.Request.Name = name || '';
-            if(devices.page.Request.Name){
-                devices.page.Request.Ids = getTuntapMachines(devices.page.Request.Name)
-                .concat(getSocks5Machines(devices.page.Request.Name))
-                .reduce((arr,id)=>{
-                    if(arr.indexOf(id) == -1){
-                        arr.push(id);
-                    }
-                    return arr;
-               },[]);
-            }else{
-                devices.page.Request.Ids = [];
-            }
-            handlePageChange();
+        const handlePageRefresh = ()=>{
+            devices.page.Request.Ids = getTuntapMachines(devices.page.Request.Name)
+            .concat(getSocks5Machines(devices.page.Request.Name))
+            .reduce((arr,id)=>{
+                if(arr.indexOf(id) == -1){
+                    arr.push(id);
+                }
+                return arr;
+            },[]);
+            handlePageChange(devices.page.Request.Page);
         }
 
         onMounted(() => {
             window.dispatchEvent(new Event('resize'));
-            handlePageChange();
-            
             deviceStartProcess();
             updaterSubscribe();
         });
@@ -209,12 +189,12 @@ export default {
         });
 
         return {
-            state,devices,deviceRefreshHook,handleSortChange, handlePageRefresh, handlePageChange,handlePageSizeChange,
+            state,devices,deviceRefreshHook,handleSortChange, handlePageRefresh, handlePageChange,handlePageSizeChange,handleSearchChange,
             tuntap,
             socks5,
             tunnel,connections,
             forward,
-            sforward,
+            reverse,
             updater,flow,oper,firewall,wakeup,transport,action,wlist
         }
     }
@@ -226,12 +206,12 @@ export default {
     th.el-table__cell.is-leaf{border-bottom:0}
     .el-table__inner-wrapper:before{height:0}
 }
+.home-list-wrap .el-table__body .el-table__cell{padding:8px 0;}
 </style>
 <style lang="stylus" scoped>
 .home-list-wrap{
-    padding:1rem;
 
-    .page{padding-top:1rem}
+    .page{padding:1rem 0;border:1px solid var(--table-border-color);border-top:0;}
     .page-wrap{
         display:inline-block;
     }

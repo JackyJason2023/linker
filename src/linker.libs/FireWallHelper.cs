@@ -1,70 +1,63 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Net;
+using System.Xml.Linq;
 
 namespace linker.libs
 {
     public static class FireWallHelper
     {
-        public static void WriteAny(string fileName)
+        public static void Write(string fileName)
         {
             if (OperatingSystem.IsWindows())
             {
                 Windows(fileName);
             }
-            else if (OperatingSystem.IsLinux())
-            {
-                Linux(fileName);
-            }
         }
-        public static void WriteIcmp(string fileName, IPAddress ip, byte prefixLength)
+        public static void Write(string fileName, IPAddress ip, byte prefixLength, (IPAddress ip, IPAddress mapIp, byte prefixLength)[] lans)
         {
             if (OperatingSystem.IsWindows())
             {
-                Windows(fileName, ip, prefixLength);
+                Windows(fileName, ip, prefixLength, lans);
             }
         }
-
-        private static void Linux(string fileName)
-        {
-            /*
-            fileName = Path.GetFileNameWithoutExtension(fileName);
-            CommandHelper.Linux(string.Empty, new string[] {
-                $"firewall-cmd --permanent --new-service={fileName}",
-                $"firewall-cmd --permanent --service={fileName} --set-short=\"My Application {fileName}\"",
-                $"firewall-cmd --permanent --service={fileName} --set-description=\"Allow all ports for my application {fileName}\"",
-                $"firewall-cmd --permanent --service={fileName} --add-port=0-65535/tcp",
-                $"firewall-cmd --permanent --service={fileName} --add-port=0-65535/udp",
-                $"firewall-cmd --permanent --service={fileName} --add-port=0-65535/icmp",
-                $"firewall-cmd --permanent --add-service={fileName}",
-                $"firewall-cmd --reload",
-            });
-            */
-        }
-
         private static void Windows(string fileName)
         {
             try
             {
                 string name = Path.GetFileNameWithoutExtension(fileName);
                 CommandHelper.Windows(string.Empty, new string[] {
+                    $"netsh advfirewall firewall delete rule name=\"{name}\"",
+                    $"netsh advfirewall firewall delete rule name=\"{name}.exe\"",
                     $"netsh advfirewall firewall delete rule name=\"{name}-any\"",
-                    $"netsh advfirewall firewall add rule name=\"{name}-any\" dir=in action=allow program=\"{fileName}\" enable=yes"
+                    $"netsh advfirewall firewall delete rule name=\"{name}-tcp\"",
+                    $"netsh advfirewall firewall delete rule name=\"{name}-udp\"",
+                    $"netsh advfirewall firewall delete rule name=\"{name}-icmp\"",
+                    $"netsh advfirewall firewall add rule name=\"{name}-any\" dir=in action=allow protocol=any program=\"{fileName}\" enable=yes",
                 });
             }
             catch (Exception)
             {
             }
         }
-        private static void Windows(string fileName, IPAddress ip, byte prefixLength)
+        private static void Windows(string fileName, IPAddress ip, byte prefixLength, (IPAddress ip, IPAddress mapIp, byte prefixLength)[] lans)
         {
             try
             {
                 string name = Path.GetFileNameWithoutExtension(fileName);
                 CommandHelper.Windows(string.Empty, new string[] {
+                    $"netsh advfirewall firewall delete rule name=\"{name}\"",
+                    $"netsh advfirewall firewall delete rule name=\"{name}.exe\"",
+                    $"netsh advfirewall firewall delete rule name=\"{name}-any\"",
+                    $"netsh advfirewall firewall delete rule name=\"{name}-tcp\"",
+                    $"netsh advfirewall firewall delete rule name=\"{name}-udp\"",
                     $"netsh advfirewall firewall delete rule name=\"{name}-icmp\"",
-                    $"netsh advfirewall firewall add rule name=\"{name}-icmp\" dir=in action=allow protocol=icmpv4 localip={ip}/{prefixLength} enable=yes",
+                    $"netsh advfirewall firewall add rule name=\"{name}-any\" dir=in action=allow protocol=any program=\"{fileName}\" enable=yes",
+                    $"netsh advfirewall firewall add rule name=\"{name}-any\" dir=in action=allow protocol=any localip={ip}/{prefixLength} enable=yes",
                 });
+                string[] add = lans.Select(c => $"netsh advfirewall firewall add rule name=\"{name}-any\" dir=in action=allow protocol=any localip={(IPAddress.Any.Equals(c.mapIp) ? c.ip : c.mapIp)}/{c.prefixLength} enable=yes").ToArray();
+                CommandHelper.Windows(string.Empty, add);
             }
             catch (Exception)
             {

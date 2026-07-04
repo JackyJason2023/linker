@@ -1,0 +1,15 @@
+{
+    "sync.alert": "to selected clients, all clients if not selected",
+    "sync.select": "Please select",
+    "sync.SignInSuperKey": "Signin secretKey",
+    "server.sync.SignInSecretKey": "Signin secretKey",
+    "server.sync.SignInServer": "Signin server",
+    "sync.GroupSecretKey": "Group secretKey",
+    "sync.RelaySecretKey": "Relay secretKey",
+    "sync.ReverseSecretKey": "Server forward secretKey",
+    "sync.UpdaterSecretKey": "Updater config",
+    "sync.TunnelTransports": "Tunnel transports",
+    "sync.SignInUserId": "User Id",
+    "sync.ActionStatic": "Action args",
+    "sync.Firewall": "Firewall selected item"
+}

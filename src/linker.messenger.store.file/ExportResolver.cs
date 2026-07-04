@@ -91,7 +91,6 @@ namespace linker.messenger.store.file
             return string.Empty;
         }
 
-
         public async Task Resolve(Socket socket, Memory<byte> memory)
         {
             using CancellationTokenSource cts = new CancellationTokenSource(3000);
@@ -147,7 +146,7 @@ namespace linker.messenger.store.file
         }
         public async Task Resolve(Socket socket, IPEndPoint ep, Memory<byte> memory)
         {
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
         }
     }
 

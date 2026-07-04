@@ -2,7 +2,7 @@
     <div>
         <el-table :data="state.data" size="small" border height="500">
             <el-table-column property="Ip" label="IP"></el-table-column>
-            <el-table-column property="Id" label="目标">
+            <el-table-column property="Id" :label="$t('tuntap.route.target')">
                 <template #default="scope">
                     <span>{{ state.names[scope.row.Id] }}</span>
                 </template>

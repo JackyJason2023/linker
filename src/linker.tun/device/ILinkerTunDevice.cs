@@ -38,6 +38,7 @@ namespace linker.tun.device
         /// </summary>
         public void Refresh();
 
+        public void SetMssFix(int value = 0);
         /// <summary>
         /// 设置MTU
         /// </summary>
@@ -84,7 +85,7 @@ namespace linker.tun.device
         /// 读取数据包
         /// </summary>
         /// <returns></returns>
-        public byte[] Read(out int length);
+        public byte[] Read(out uint length);
         /// <summary>
         /// 写入数据包
         /// </summary>
@@ -122,6 +123,10 @@ namespace linker.tun.device
         /// MTU
         /// </summary>
         public int Mtu { get; set; } = 1420;
+        /// <summary>
+        /// MSS 钳制
+        /// </summary>
+        public int MssFix { get; set; }
     }
 
     /// <summary>
@@ -134,9 +139,9 @@ namespace linker.tun.device
         /// </summary>
         /// <param name="packet"></param>
         /// <returns></returns>
-        public Task Callback(LinkerTunDevicPacket packet);
-        public Task Callback(LinkerSrcProxyReadPacket proxy);
-        public bool Callback(uint ip);
+        public ValueTask<bool> Callback(LinkerTunDevicPacket packet);
+        public ValueTask<bool> Callback(LinkerSrcProxyReadPacket proxy);
+        public int Callback(uint ip);
     }
 
 
@@ -193,19 +198,9 @@ namespace linker.tun.device
         /// </summary>
         public ReadOnlyMemory<byte> SrcIp { get; private set; }
         /// <summary>
-        /// 源端口
-        /// </summary>
-        public ushort SrcPort { get; private set; }
-
-        /// <summary>
         /// 目标IP
         /// </summary>
         public ReadOnlyMemory<byte> DstIp { get; private set; }
-
-        /// <summary>
-        /// 目标端口
-        /// </summary>
-        public ushort DstPort { get; private set; }
 
         public bool IPV4Broadcast => Version == 4 && DstIp.IsCast();
         public bool IPV6Multicast => Version == 6 && (DstIp.Span[0] & 0xFF) == 0xFF;
@@ -220,42 +215,15 @@ namespace linker.tun.device
             Length = length;
 
             ReadOnlyMemory<byte> ipPacket = Buffer.AsMemory(Offset + pad, Length - pad);
-            Version = (byte)(ipPacket.Span[0] >> 4 & 0b1111);
+            ReadOnlySpan<byte> span = ipPacket.Span;
 
-            SrcIp = Helper.EmptyArray;
-            DstIp = Helper.EmptyArray;
+            Version = (byte)(span[0] >> 4 & 0b1111);
+            ProtocolType = (ProtocolType)(span[9]);
 
-            if (Version == 4)
-            {
-                SrcIp = ipPacket.Slice(12, 4);
-                DstIp = ipPacket.Slice(16, 4);
-
-                ProtocolType = (ProtocolType)ipPacket.Span[9];
-
-                if (ProtocolType == ProtocolType.Tcp || ProtocolType == ProtocolType.Udp)
-                {
-                    SrcPort = BinaryPrimitives.ReverseEndianness(ipPacket.Slice(20, 2).ToUInt16());
-                    DstPort = BinaryPrimitives.ReverseEndianness(ipPacket.Slice(22, 2).ToUInt16());
-                }
-            }
-            else if (Version == 6)
-            {
-                SrcIp = ipPacket.Slice(8, 16);
-                DstIp = ipPacket.Slice(24, 16);
-
-                ProtocolType = (ProtocolType)ipPacket.Span[6];
-
-                if (ProtocolType == ProtocolType.Tcp || ProtocolType == ProtocolType.Udp)
-                {
-                    SrcPort = BinaryPrimitives.ReverseEndianness(ipPacket.Slice(42, 2).ToUInt16());
-                    DstPort = BinaryPrimitives.ReverseEndianness(ipPacket.Slice(44, 2).ToUInt16());
-                }
-            }
+            SrcIp = ipPacket.Slice(12, 4);
+            DstIp = ipPacket.Slice(16, 4);
         }
-
     }
-
-
 
     /// <summary>
     /// 添加路由项
@@ -296,4 +264,6 @@ namespace linker.tun.device
         public IPAddress IP { get; set; }
         public byte PrefixLength { get; set; }
     }
+
+
 }

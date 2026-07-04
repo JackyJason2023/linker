@@ -2,8 +2,7 @@
 using linker.libs.extends;
 using linker.libs.timer;
 using linker.messenger.channel;
-using linker.messenger.forward.proxy;
-using linker.messenger.pcp;
+using linker.messenger.forward;
 using linker.messenger.signin;
 using linker.tunnel;
 using linker.tunnel.connection;
@@ -17,9 +16,9 @@ namespace linker.messenger.flow
     {
         private readonly FlowForward forwardFlow;
         private readonly FlowTunnel flowTunnel;
-        public FlowForwardProxy(FlowForward forwardFlow, FlowTunnel flowTunnel, ISignInClientStore signInClientStore, TunnelTransfer tunnelTransfer, PcpTransfer pcpTransfer,
-            SignInClientTransfer signInClientTransfer, ChannelConnectionCaching  channelConnectionCaching) 
-            : base(signInClientStore, tunnelTransfer,  pcpTransfer, signInClientTransfer, channelConnectionCaching)
+        public FlowForwardProxy(FlowForward forwardFlow, FlowTunnel flowTunnel, ISignInClientStore signInClientStore, TunnelTransfer tunnelTransfer,
+            SignInClientTransfer signInClientTransfer, ChannelConnectionCaching channelConnectionCaching)
+            : base(signInClientStore, tunnelTransfer, signInClientTransfer, channelConnectionCaching)
         {
             this.forwardFlow = forwardFlow;
             this.flowTunnel = flowTunnel;

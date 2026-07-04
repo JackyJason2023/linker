@@ -1,7 +1,7 @@
-﻿using System.Net;
-using linker.libs;
-using System.Collections.Concurrent;
+﻿using linker.libs;
 using linker.libs.timer;
+using System.Collections.Concurrent;
+using System.Net;
 
 namespace linker.messenger.tuntap.lease
 {
@@ -19,6 +19,10 @@ namespace linker.messenger.tuntap.lease
                 foreach (var item in leaseServerStore.Get())
                 {
                     caches.TryAdd(item.Key, item);
+                    foreach (var itemSub in item.CacheSubs)
+                    {
+                        caches.TryAdd($"{itemSub.Key}", itemSub);
+                    }
                 }
             }
             catch (Exception)
@@ -60,7 +64,28 @@ namespace linker.messenger.tuntap.lease
 
                 cache.IP = NetworkHelper.ToValue(info.IP);
                 cache.PrefixValue = NetworkHelper.ToPrefixValue(info.PrefixLength);
-                cache.Name = info.Name;
+                cache.Network = NetworkHelper.ToNetworkValue(cache.IP, cache.PrefixValue);
+                cache.Broadcast = NetworkHelper.ToBroadcastValue(cache.IP, cache.PrefixValue);
+                cache.Info = info;
+
+                foreach (var item in caches.Where(c => c.Key.Contains($"{key}-")).Select(c => c.Key).ToList())
+                {
+                    caches.TryRemove(item, out _);
+                }
+                cache.CacheSubs = cache.Info.Subs.Where(c => IPAddress.Any.Equals(c.IP) == false).Select(c =>
+                {
+                    string _key = $"{key}-{c.Name}";
+                    if (caches.TryGetValue(_key, out LeaseCacheInfo _cache) == false)
+                    {
+                        _cache = new LeaseCacheInfo { Key = _key };
+                        caches.TryAdd(_key, _cache);
+                    }
+                    _cache.IP = NetworkHelper.ToValue(c.IP);
+                    _cache.PrefixValue = NetworkHelper.ToPrefixValue(c.PrefixLength);
+                    _cache.Network = NetworkHelper.ToNetworkValue(_cache.IP, _cache.PrefixValue);
+                    _cache.Broadcast = NetworkHelper.ToBroadcastValue(_cache.IP, _cache.PrefixValue);
+                    return _cache;
+                }).ToList();
 
                 //网络配置有变化，清理分配，让他们重新申请
                 if (oldIP != cache.IP || oldPrefix != cache.PrefixValue)
@@ -80,7 +105,7 @@ namespace linker.messenger.tuntap.lease
         {
             if (caches.TryGetValue(key, out LeaseCacheInfo cache))
             {
-                return new LeaseInfo { IP = NetworkHelper.ToIP(cache.IP), PrefixLength = NetworkHelper.ToPrefixLength(cache.PrefixValue), Name = cache.Name };
+                return cache.Info;
             }
             return new LeaseInfo { IP = IPAddress.Any, PrefixLength = 24 };
         }
@@ -100,46 +125,86 @@ namespace linker.messenger.tuntap.lease
             {
                 return info;
             }
+
+            LeaseCacheInfo topCache = cache;
             cache.LastTime = DateTime.Now;
-            info.PrefixLength = NetworkHelper.ToPrefixLength(cache.PrefixValue);
-            info.Name = cache.Name;
+            info.Name = cache.Info.Name;
 
-
-            LeaseCacheUserInfo self = cache.Users.FirstOrDefault(c => c.Id == userId);
-            //已有的
-            if (self != null)
+            //如果选择子网
+            if (string.IsNullOrWhiteSpace(info.SubName) == false && caches.TryGetValue($"{key}-{info.SubName}", out LeaseCacheInfo _cache))
             {
-                if (NetworkHelper.ToValue(info.IP) == self.IP || info.IP.Equals(IPAddress.Any))
-                {
-                    self.LastTime = DateTime.Now;
-                    uint networkValue = NetworkHelper.ToNetworkValue(cache.IP, cache.PrefixValue);
-                    info.IP = NetworkHelper.ToIP(self.IP & ~cache.PrefixValue | networkValue);
-                    self.IP = NetworkHelper.ToValue(info.IP);
-                    return info;
-                }
-                cache.Users.Remove(self);
+                _cache.Users = cache.Users;
+                cache = _cache;
             }
+            info.PrefixLength = NetworkHelper.ToPrefixLength(cache.PrefixValue);
 
             lock (cache)
             {
-                uint newIPValue = info.IP.Equals(IPAddress.Any) ? DynamicIP(userId, cache) : StaticIP(userId, info.IP, cache);
-                //分配失败，怎么来的怎么回去
-                if (newIPValue == 0)
+                //已有ip
+                uint newIPValue = ExistsIp(userId, info.IP, cache);
+                if (newIPValue != 0)
                 {
-                    //万一网络号已经不一样了，更新一下
-                    uint value = NetworkHelper.ToValue(info.IP);
-                    uint networkValue = NetworkHelper.ToNetworkValue(cache.IP, cache.PrefixValue);
-                    info.IP = NetworkHelper.ToIP(value & ~cache.PrefixValue | networkValue);
+                    info.IP = NetworkHelper.ToIP(newIPValue);
                     return info;
                 }
 
+                //0.0.0.0 表示动态分配
+                if (info.IP.Equals(IPAddress.Any))
+                {
+                    newIPValue = DynamicIp(userId, cache);
+                }
+                else
+                {
+                    newIPValue = StaticIp(userId, info.IP, cache);
+                    //静态分配失败
+                    if (newIPValue == 1)
+                    {
+                        newIPValue = DynamicIp(userId, cache);
+                    }
+                }
+                //还是失败了
+                if (newIPValue <= 1)
+                {
+                    //更新一下网络号
+                    info.IP = NetworkHelper.ToIP(NetworkHelper.ToValue(info.IP) & ~cache.PrefixValue | cache.Network);
+                    return info;
+                }
                 cache.Users.Add(new LeaseCacheUserInfo { Id = userId, IP = newIPValue, LastTime = DateTime.Now });
-                leaseServerStore.Update(cache);
+                leaseServerStore.Update(topCache);
                 leaseServerStore.Confirm();
 
                 info.IP = NetworkHelper.ToIP(newIPValue);
                 return info;
             }
+        }
+
+        /// <summary>
+        /// 已存在ip
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <param name="ip"></param>
+        /// <param name="cache"></param>
+        /// <returns></returns>
+        private uint ExistsIp(string userId, IPAddress ip, LeaseCacheInfo cache)
+        {
+            LeaseCacheUserInfo self = cache.Users.FirstOrDefault(c => c.Id == userId);
+            if (self != null)
+            {
+                uint value = NetworkHelper.ToValue(ip);
+
+                bool validate = value == self.IP
+                    && cache.InRange(value)
+                    && cache.InSub(value) == false;
+
+                if (validate || value == 0)
+                {
+                    self.LastTime = DateTime.Now;
+                    self.IP = self.IP & ~cache.PrefixValue | cache.Network;
+                    return self.IP;
+                }
+                cache.Users.Remove(self);
+            }
+            return 0;
         }
         /// <summary>
         /// 静态IP
@@ -148,30 +213,26 @@ namespace linker.messenger.tuntap.lease
         /// <param name="ip"></param>
         /// <param name="cache"></param>
         /// <returns></returns>
-        private uint StaticIP(string userId, IPAddress ip, LeaseCacheInfo cache)
+        private uint StaticIp(string userId, IPAddress ip, LeaseCacheInfo cache)
         {
-            uint value = NetworkHelper.ToValue(ip);
-            //网络号
-            uint networkValue = NetworkHelper.ToNetworkValue(cache.IP, cache.PrefixValue);
-            //新的IP
-            uint newIPValue = value & ~cache.PrefixValue | networkValue;
+            uint value = NetworkHelper.ToValue(ip) & ~cache.PrefixValue | cache.Network;
 
-            LeaseCacheUserInfo other = cache.Users.FirstOrDefault(c => c.IP == newIPValue && c.Id != userId);
-            //这个IP有人用
-            if (other != null)
+            //不在范围内
+            if (cache.InRange(value) == false)
             {
-                //超时了，删掉
-                if ((DateTime.Now - other.LastTime).Days > 7)
-                {
-                    cache.Users.Remove(other);
-                }
-                else
-                {
-                    newIPValue = 0;
-                }
+                return 1;
             }
-
-            return newIPValue;
+            //被子网占用
+            if (cache.InSub(value))
+            {
+                return 1;
+            }
+            //已被分配
+            if (cache.InLease(userId, value, leaseServerStore.Info.IPDays))
+            {
+                return 0;
+            }
+            return value;
         }
         /// <summary>
         /// 动态分配
@@ -179,34 +240,41 @@ namespace linker.messenger.tuntap.lease
         /// <param name="userId"></param>
         /// <param name="cache"></param>
         /// <returns></returns>
-        private uint DynamicIP(string userId, LeaseCacheInfo cache)
+        private uint DynamicIp(string userId, LeaseCacheInfo cache)
         {
-            //网络号
-            uint networkValue = NetworkHelper.ToNetworkValue(cache.IP, cache.PrefixValue);
-            //广播
-            uint broadcastValue = NetworkHelper.ToBroadcastValue(cache.IP, cache.PrefixValue);
-            //第一个可用IP，一般第一个可用IP作为网关，所以+2
-            uint firstIPValue = networkValue + 1 + 1;
-            //最后一个可用IP，最后一个IP是广播地址，所以-1
-            uint lastIPValue = broadcastValue - 1;
+            //第一个可用IP
+            uint firstIPValue = cache.Network + 2;
+            //最后一个可用IP
+            uint lastIPValue = cache.Broadcast - 1;
             //IP数
-            uint length = lastIPValue - networkValue;
+            uint length = lastIPValue - firstIPValue + 1;
+
+            //子网，排除子网
+            IEnumerable<uint> subs = cache.CacheSubs.SelectMany(c => UIntRange(c.Network, c.Broadcast - c.Network + 1));
 
             //空闲的IP
-            IEnumerable<int> idleIPs = Enumerable.Range((int)firstIPValue, (int)length + 1).Except(cache.Users.Select(c => (int)c.IP));
+            IEnumerable<uint> idleIPs = UIntRange(firstIPValue, length).Except(cache.Users.Select(c => c.IP)).Except(subs);
             //过期的IP
-            IEnumerable<int> expireIPs = cache.Users
+            IEnumerable<uint> expireIPs = cache.Users
                 .Where(c => (DateTime.Now - c.LastTime).TotalDays > leaseServerStore.Info.IPDays)
-                .OrderBy(c => c.LastTime).Select(c => (int)c.IP);
+                .OrderBy(c => c.LastTime).Select(c => c.IP).Except(subs);
 
-            uint newIPValue = (uint)idleIPs.FirstOrDefault();
+            uint newIPValue = idleIPs.FirstOrDefault();
             //没找到空闲的，但是有其它超时的，抢一个
             if (newIPValue == 0 && expireIPs.Any())
             {
-                newIPValue = (uint)expireIPs.FirstOrDefault();
+                newIPValue = expireIPs.FirstOrDefault();
                 cache.Users.Remove(cache.Users.FirstOrDefault(c => c.IP == newIPValue));
             }
             return newIPValue;
+
+            IEnumerable<uint> UIntRange(uint start, uint count)
+            {
+                for (uint i = 0; i < count; i++)
+                {
+                    yield return start + i;
+                }
+            }
         }
 
 
@@ -273,36 +341,132 @@ namespace linker.messenger.tuntap.lease
         /// <summary>
         /// 前缀，掩码长度
         /// </summary>
-        public byte PrefixLength { get; set; } = 32;
+        public byte PrefixLength { get; set; } = 24;
         /// <summary>
         /// 网卡名
         /// </summary>
+        public string Name { get; set; } = "linker";
+
+        /// <summary>
+        /// 仅传输，不需要任何设置
+        /// </summary>
+        public string SubName { get; set; } = string.Empty;
+
+        public List<LeaseSubInfo> Subs { get; set; } = [];
+
+        public int Mtu { get; set; } = 1420;
+
+        public int MssFix { get; set; }
+
+        public TuntapVlsmStatus VlsmStatus { get; set; } = TuntapVlsmStatus.OneWay;
+    }
+    public sealed partial class LeaseSubInfo
+    {
+        public LeaseSubInfo() { }
+
+        /// <summary>
+        /// 网络号
+        /// </summary>
+        public IPAddress IP { get; set; } = IPAddress.Any;
+        /// <summary>
+        /// 前缀，掩码长度
+        /// </summary>
+        public byte PrefixLength { get; set; } = 32;
+        /// <summary>
+        /// 网络名
+        /// </summary>
         public string Name { get; set; } = string.Empty;
+
     }
 
     public sealed class LeaseCacheInfo
     {
         public string Id { get; set; }
-
         public string Key { get; set; }
-        public string Name { get; set; } = string.Empty;
 
         /// <summary>
-        /// 网络号
+        /// IP
         /// </summary>
         public uint IP { get; set; }
         /// <summary>
         /// 前缀，掩码
         /// </summary>
         public uint PrefixValue { get; set; }
+
+        /// <summary>
+        /// 网络
+        /// </summary>
+        public uint Network { get; set; }
+        /// <summary>
+        /// 广播
+        /// </summary>
+        public uint Broadcast { get; set; }
+
         /// <summary>
         /// 最后活动时间
         /// </summary>
         public DateTime LastTime { get; set; } = DateTime.Now;
 
         public List<LeaseCacheUserInfo> Users { get; set; } = new List<LeaseCacheUserInfo>();
-    }
+        public List<LeaseCacheInfo> CacheSubs { get; set; } = new List<LeaseCacheInfo>();
 
+        public LeaseInfo Info { get; set; } = new LeaseInfo();
+
+        /// <summary>
+        /// 交集
+        /// </summary>
+        /// <param name="ip"></param>
+        /// <param name="prefixLength"></param>
+        /// <returns></returns>
+        public bool Intersect(IPAddress ip, byte prefixLength)
+        {
+            uint _ip = NetworkHelper.ToValue(ip);
+            uint _prefix = NetworkHelper.ToPrefixValue(prefixLength);
+            uint _network = NetworkHelper.ToNetworkValue(_ip, _prefix);
+            uint _broadcast = NetworkHelper.ToBroadcastValue(_ip, _prefix);
+
+            return Math.Max(_network, Network + 2) <= Math.Min(_broadcast, Broadcast - 1);
+        }
+        /// <summary>
+        /// 在范围内
+        /// </summary>
+        /// <param name="ip"></param>
+        /// <returns></returns>
+        public bool InRange(uint ip)
+        {
+            return ip >= Network + 2 && ip <= Broadcast - 1;
+        }
+        /// <summary>
+        /// 在子网
+        /// </summary>
+        /// <param name="ip"></param>
+        /// <returns></returns>
+        public bool InSub(uint ip)
+        {
+            return CacheSubs.Any(c => ip >= c.Network + 2 && ip <= c.Broadcast - 1);
+        }
+        /// <summary>
+        /// 已分配
+        /// </summary>
+        /// <param name="userid"></param>
+        /// <param name="ip"></param>
+        /// <param name="days"></param>
+        /// <returns></returns>
+        public bool InLease(string userid, uint ip, int days)
+        {
+            LeaseCacheUserInfo other = Users.FirstOrDefault(c => c.IP == ip && c.Id != userid);
+            if (other != null)
+            {
+                if ((DateTime.Now - other.LastTime).Days <= days)
+                {
+                    return true;
+
+                }
+                Users.Remove(other);
+            }
+            return false;
+        }
+    }
     public sealed class LeaseCacheUserInfo
     {
         public string Id { get; set; }

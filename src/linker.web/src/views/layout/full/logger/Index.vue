@@ -6,7 +6,7 @@
                     <div class="inner h-100 flex flex-column flex-nowrap">
                         <div class="head flex">
                             <div>
-                                <el-select v-model="state.type" @change="loadData" size="small" class="mgr-1" style="width: 6rem;">
+                                <el-select v-model="state.type" @change="loadData" size="small" class="mgr-1 w-6">
                                     <el-option :value="-1" label="all"></el-option>
                                     <el-option :value="0" label="debug"></el-option>
                                     <el-option :value="1" label="info"></el-option>
@@ -54,7 +54,7 @@
             </AccessShow>
         </el-tabs>
     </div>
-    <el-dialog class="options-center" title="" destroy-on-close v-model="state.show" width="98%" top="2vh">
+    <el-dialog append-to=".app-wrap" class="options-center" title="" destroy-on-close v-model="state.show" width="80rem" top="2vh">
         <div>
             <textarea class="logger-content">{{ state.content }}</textarea>
         </div>
@@ -143,11 +143,9 @@ export default {
     }
 
 .logger-setting-wrap {
-    padding: 1rem;
     box-sizing: border-box;
 
     .inner {
-        padding: 1rem;
         box-sizing: border-box;
     }
 
@@ -162,7 +160,7 @@ export default {
     padding: 1rem;
     margin-top:1rem;
     background: #f5f5f5;
-    border:1px solid #eee;
+    border:1px solid var(--table-border-color);
     border-radius: 4px;
     font-size: 1.2rem;
     resize: none;

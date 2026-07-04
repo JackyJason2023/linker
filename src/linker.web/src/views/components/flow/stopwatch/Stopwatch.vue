@@ -1,6 +1,6 @@
 <template>
     <el-table :data="state.list" stripe border size="small" width="100%" height="60vh">
-        <el-table-column prop="id" label="id" width="200"></el-table-column>
+        <el-table-column prop="id" label="id" width="80"></el-table-column>
         <el-table-column prop="request" label="request" sortable>
             <template #default="scope">
                 <span>{{ scope.row.request }}ms / {{ scope.row.requestMax }}ms</span>
@@ -32,7 +32,7 @@ export default {
             getStopwatch(props.machineId).then(res => {
                 state.list = Object.keys(res).map(c=>{
                     return {
-                        id:`${t(`status.messenger${c}`)}(${c})`,
+                        id:c,
                         request:(BigInt(res[c].SendtBytes) & (BigInt(0xffffffff))).toString(),
                         requestMax:(BigInt(res[c].SendtBytes)>>BigInt(32)).toString(),
                         response:(BigInt(res[c].ReceiveBytes) & (BigInt(0xffffffff))).toString(),

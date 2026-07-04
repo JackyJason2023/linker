@@ -1,11 +1,11 @@
 <template>
-   <el-dialog class="options-center" :title="$t('server.denyAdd')" destroy-on-close v-model="state.show" width="28rem" top="2vh">
+   <el-dialog append-to=".app-wrap" class="options-center" :title="$t('deny.add')" destroy-on-close v-model="state.show" width="28rem" top="2vh">
         <div>
             <el-form ref="ruleFormRef" :model="state.ruleForm" :rules="state.rules" label-width="auto">
-                <el-form-item :label="$t('server.denyStr')" prop="Str">
+                <el-form-item :label="$t('deny.str')" prop="Str">
                     <el-input v-trim v-model="state.ruleForm.Str" />
                 </el-form-item>
-                <el-form-item :label="$t('server.denyRemark')" prop="Remark">
+                <el-form-item :label="$t('deny.remark')" prop="Remark">
                     <el-input v-trim v-model="state.ruleForm.Remark" />
                 </el-form-item>
                 <el-form-item></el-form-item>
@@ -22,7 +22,7 @@
 
 <script>
 import { relayDenysAdd } from '@/apis/relay';
-import { sforwardDenysAdd } from '@/apis/sforward';
+import { reverseDenysAdd } from '@/apis/reverse';
 import { ElMessage } from 'element-plus';
 import { reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
@@ -30,9 +30,8 @@ export default {
     props: ['modelValue','type','data'],
     emits: ['update:modelValue','success'],
     setup(props,{emit}) {
-        console.log(props.data);
         const {t} = useI18n();
-        const saveFn = props.type = 'relay' ? relayDenysAdd:sforwardDenysAdd
+        const saveFn = props.type = 'relay' ? relayDenysAdd:reverseDenysAdd
         const state = reactive({
             show:true,
             ruleForm:{
@@ -66,7 +65,7 @@ export default {
 
                 const json = JSON.parse(JSON.stringify(state.ruleForm));
                 saveFn(json).then(()=>{
-                    ElMessage.success(t('common.oper'));
+                    ElMessage.success(t('common.opered'));
                     state.show = false;
                     emit('success');
                 }).catch(()=>{

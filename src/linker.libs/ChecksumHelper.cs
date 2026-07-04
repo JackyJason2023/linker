@@ -1,177 +1,355 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
-using System.Net.Sockets;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
 namespace linker.libs
 {
     public sealed class ChecksumHelper
     {
+        public readonly struct ChecksumState
+        {
+            public readonly ulong Addr;
+            public readonly uint Port;
+            public readonly int ChecksumOffset;
 
-        /// <summary>
-        /// 计算IP包的校验和，当校验和为0时才计算
-        /// </summary>
-        /// <param name="packet">一个完整的IP包</param>
-        /// <param name="ipHeader">是否计算IP头校验和</param>
-        /// <param name="payload">是否计算荷载协议校验和</param>
-        public static unsafe void ChecksumWithZero(ReadOnlyMemory<byte> packet, bool ipHeader = true, bool payload = true)
-        {
-            ChecksumWithZero(packet.Span, ipHeader, payload);
-        }
-        /// <summary>
-        /// 计算IP包的校验和，当校验和为0时才计算
-        /// </summary>
-        /// <param name="packet">一个完整的IP包</param>
-        /// <param name="ipHeader">是否计算IP头校验和</param>
-        /// <param name="payload">是否计算荷载协议校验和</param>
-        public static unsafe void ChecksumWithZero(ReadOnlySpan<byte> packet, bool ipHeader = true, bool payload = true)
-        {
-            fixed (byte* ptr = packet)
+            public ChecksumState(ulong addr, uint port, int checksumOffset)
             {
-                ChecksumWithZero(ptr, ipHeader, payload);
+                Addr = addr;
+                Port = port;
+                ChecksumOffset = checksumOffset;
             }
         }
-        /// <summary>
-        /// 计算IP包的校验和，当校验和为0时才计算
-        /// </summary>
-        /// <param name="ptr">IP包指针</param>
-        /// <param name="ipHeader">是否计算IP头校验和</param>
-        /// <param name="payload">是否计算荷载协议校验和</param>
-        public static unsafe void ChecksumWithZero(byte* ptr, bool ipHeader = true, bool payload = true)
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ChecksumState CaptureChecksumState(scoped in ReadOnlyMemory<byte> memory)
         {
-            byte ipHeaderLength = (byte)((*ptr & 0b1111) * 4);
-            byte* packetPtr = ptr + ipHeaderLength;
-            
-            ipHeader = ipHeader && *(ushort*)(ptr + 10) == 0;
-            payload = payload && ((ProtocolType)(*(ptr + 9)) switch
-            {
-                ProtocolType.Icmp => *(ushort*)(packetPtr + 2) == 0,
-                ProtocolType.Tcp => *(ushort*)(packetPtr + 16) == 0,
-                ProtocolType.Udp => *(ushort*)(packetPtr + 6) == 0,
-                _ => false,
-            });
-            
-            if (ipHeader || payload)
-                Checksum(ptr, ipHeader, payload);
+            return CaptureChecksumState(memory.Span);
         }
 
-        /// <summary>
-        /// 计算IP包的校验和
-        /// </summary>
-        /// <param name="packet">一个完整的IP包</param>
-        /// <param name="ipHeader">是否计算IP头校验和</param>
-        /// <param name="payload">是否计算荷载协议校验和</param>
-        public static unsafe void Checksum(ReadOnlyMemory<byte> packet, bool ipHeader = true, bool payload = true)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ChecksumState CaptureChecksumState(scoped in ReadOnlySpan<byte> span)
         {
-            Checksum(packet.Span, ipHeader, payload);
+            ref byte packetRef = ref MemoryMarshal.GetReference(span);
+            return CaptureChecksumState(ref packetRef);
         }
-        /// <summary>
-        /// 计算IP包的校验和
-        /// </summary>
-        /// <param name="packet">一个完整的IP包</param>
-        /// <param name="ipHeader">是否计算IP头校验和</param>
-        /// <param name="payload">是否计算荷载协议校验和</param>
-        public static unsafe void Checksum(ReadOnlySpan<byte> packet, bool ipHeader = true, bool payload = true)
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ChecksumState CaptureChecksumState(ref byte packetRef)
         {
-            fixed (byte* ptr = packet)
-            {
-                Checksum(ptr, ipHeader, payload);
-            }
-        }
-        /// <summary>
-        /// 计算IP包的校验和
-        /// </summary>
-        /// <param name="ptr">IP包指针</param>
-        /// <param name="ipHeader">是否计算IP头校验和</param>
-        /// <param name="payload">是否计算荷载协议校验和</param>
-        public static unsafe void Checksum(byte* ptr, bool ipHeader = true, bool payload = true)
-        {
-            byte ipHeaderLength = (byte)((*ptr & 0b1111) * 4);
-            byte* packetPtr = ptr + ipHeaderLength;
-            uint totalLength = BinaryPrimitives.ReverseEndianness(*(ushort*)(ptr + 2));
-            uint packetLength = totalLength - ipHeaderLength;
+            int hlen = (packetRef & 0x0F) << 2;
+            byte protocol = Unsafe.Add(ref packetRef, 9);
+            ulong addr = Unsafe.ReadUnaligned<ulong>(ref Unsafe.Add(ref packetRef, 12));
 
-            if (ipHeader)
+            if (((Unsafe.Add(ref packetRef, 6) & 0x1F) | Unsafe.Add(ref packetRef, 7)) == 0)
             {
-                //重新计算IP头校验和
-                *(ushort*)(ptr + 10) = 0;
-                *(ushort*)(ptr + 10) = Checksum((ushort*)ptr, ipHeaderLength);
-            }
-
-
-            if (payload)
-            {
-                ProtocolType protocol = (ProtocolType)(*(ptr + 9));
-                switch (protocol)
+                if (protocol == 6)
                 {
-                    case ProtocolType.Tcp:
-                        {
-                            *(ushort*)(packetPtr + 16) = 0;
-                            ulong sum = PseudoHeaderSum(ptr, packetLength);
-                            *(ushort*)(packetPtr + 16) = Checksum((ushort*)(packetPtr), packetLength, sum);
-                        }
-                        break;
-                    case ProtocolType.Udp:
-                        {
-                            *(ushort*)(packetPtr + 6) = 0;
-                            ulong sum = PseudoHeaderSum(ptr, packetLength);
-                            *(ushort*)(packetPtr + 6) = Checksum((ushort*)(packetPtr), packetLength, sum);
-                        }
-                        break;
-                    case ProtocolType.Icmp:
-                        {
-                            *(ushort*)(packetPtr + 2) = 0;
-                            *(ushort*)(packetPtr + 2) = Checksum((ushort*)(packetPtr), packetLength);
-                        }
-                        break;
+                    return new ChecksumState(addr, Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref packetRef, hlen)), hlen + 16);
+                }
+                else if (protocol == 17)
+                {
+                    return new ChecksumState(addr, Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref packetRef, hlen)), hlen + 6);
                 }
             }
+
+            return new ChecksumState(addr, 0, 0);
         }
 
-        /// <summary>
-        /// 计算校验和
-        /// </summary>
-        /// <param name="addr">包头开始位置</param>
-        /// <param name="length">计算长度，不同协议不同长度，请自己斟酌</param>
-        /// <param name="pseudoHeaderSum">伪头部和，默认0不需要伪头部和</param>
-        /// <returns></returns>
-        private static unsafe ushort Checksum(ushort* addr, uint length, ulong pseudoHeaderSum = 0)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ChecksumState CaptureChecksumState(ref byte packetRef, uint oldPort)
         {
-            ulong* ptr64 = (ulong*)addr;
+            ulong addr = Unsafe.ReadUnaligned<ulong>(ref Unsafe.Add(ref packetRef, 12));
+            uint port = 0;
+            if (oldPort > 0)
+            {
+                int hlen = (packetRef & 0x0F) << 2;
+                port = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref packetRef, hlen));
+            }
+            return new ChecksumState(addr, port, 0);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe bool UpdateChecksum(scoped in ChecksumState state, scoped in ReadOnlyMemory<byte> memory)
+        {
+            return UpdateChecksum(state, memory.Span);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe bool UpdateChecksum(scoped in ChecksumState state, scoped in ReadOnlySpan<byte> span)
+        {
+            ref byte packetRef = ref MemoryMarshal.GetReference(span);
+            ChecksumState newState = CaptureChecksumState(ref packetRef, state.Port);
+
+            bool hasIp = state.Addr != newState.Addr;
+            bool hasTransport = state.Port > 0 && (hasIp || state.Port != newState.Port);
+            if (hasIp == false && hasTransport == false)
+            {
+                return false;
+            }
+
+            if (IsZero(ref packetRef, 10) || (hasTransport && IsZero(ref packetRef, state.ChecksumOffset)))
+            {
+                RecalculateChecksum(span);
+                return true;
+            }
+
+            uint sumIp = 0;
+            if (hasIp)
+            {
+                uint sum = (uint)(~ReadRawWord(ref packetRef, 10) & 0xFFFF);
+
+                uint oldAddressComplementSum = AddressPairRawComplementSum(state.Addr);
+                uint newAddressSum = AddressPairRawSum(newState.Addr);
+                sum += oldAddressComplementSum + newAddressSum;
+                sumIp = oldAddressComplementSum + newAddressSum;
+
+                WriteRawWord(ref packetRef, 10, Fold(sum));
+            }
+
+            if (hasTransport)
+            {
+                uint sum = (uint)(~ReadRawWord(ref packetRef, state.ChecksumOffset) & 0xFFFF);
+
+                uint oldPortComplementSum = PortPairRawComplementSum(state.Port);
+                uint newPortSum = PortPairRawSum(newState.Port);
+                sum += sumIp + oldPortComplementSum + newPortSum;
+
+                WriteRawWord(ref packetRef, state.ChecksumOffset, Fold(sum));
+            }
+            return true;
+        }
+
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ushort Fold(uint sum)
+        {
+            sum = (sum & 0xFFFF) + (sum >> 16);
+            sum = (sum & 0xFFFF) + (sum >> 16);
+            return (ushort)~sum;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static uint AddressPairRawSum(ulong value)
+        {
+            return (uint)(ushort)value +
+                   (ushort)(value >> 16) +
+                   (ushort)(value >> 32) +
+                   (ushort)(value >> 48);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static uint AddressPairRawComplementSum(ulong value)
+        {
+            return 0x3FFFCu - AddressPairRawSum(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static uint PortPairRawSum(uint value)
+        {
+            return (uint)(ushort)value +
+                   (ushort)(value >> 16);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static uint PortPairRawComplementSum(uint value)
+        {
+            return 0x1FFFEu - PortPairRawSum(value);
+        }
+
+
+        private static unsafe void RecalculateChecksum(ReadOnlySpan<byte> packet)
+        {
+            fixed (byte* ptr = packet)
+            {
+                RecalculateChecksum(ptr, packet.Length);
+            }
+        }
+        private static unsafe void RecalculateChecksum(byte* ptr, int length)
+        {
+            int hlen = (*ptr & 0x0F) * 4;
+            int totalLength = ReadWord((ushort*)(ptr + 2));
+            if ((uint)totalLength > (uint)length)
+            {
+                return;
+            }
+
+            WriteWord((ushort*)(ptr + 10), 0);
+            WriteWord((ushort*)(ptr + 10), ComputeChecksum(ptr, (uint)hlen));
+
+            byte protocol = ptr[9];
+            byte* transportPtr = ptr + hlen;
+            if (protocol == 6)
+            {
+                int tcpLength = totalLength - hlen;
+                WriteTransportChecksum(transportPtr, tcpLength, 16, PseudoHeaderSum(ptr, (uint)tcpLength, protocol));
+            }
+            else if (protocol == 17)
+            {
+                int udpLength = ReadWord((ushort*)(transportPtr + 4));
+                WriteTransportChecksum(transportPtr, udpLength, 6, PseudoHeaderSum(ptr, (uint)udpLength, protocol));
+            }
+        }
+        private static unsafe ushort ComputeChecksum(byte* ptr, uint length, ulong pseudoHeaderSum = 0)
+        {
+            pseudoHeaderSum = ToLittleEndianSum(pseudoHeaderSum);
+            ulong s0 = pseudoHeaderSum;
+            ulong s1 = 0;
+            ulong s2 = 0;
+            ulong s3 = 0;
+
             while (length > 31)
             {
-                ulong value = BinaryPrimitives.ReverseEndianness(*ptr64++);
-                pseudoHeaderSum += (value & 0xFFFF) + ((value >> 16) & 0xFFFF) + ((value >> 32) & 0xFFFF) + ((value >> 48) & 0xFFFF);
-                value = BinaryPrimitives.ReverseEndianness(*ptr64++);
-                pseudoHeaderSum += (value & 0xFFFF) + ((value >> 16) & 0xFFFF) + ((value >> 32) & 0xFFFF) + ((value >> 48) & 0xFFFF);
-                value = BinaryPrimitives.ReverseEndianness(*ptr64++);
-                pseudoHeaderSum += (value & 0xFFFF) + ((value >> 16) & 0xFFFF) + ((value >> 32) & 0xFFFF) + ((value >> 48) & 0xFFFF);
-                value = BinaryPrimitives.ReverseEndianness(*ptr64++);
-                pseudoHeaderSum += (value & 0xFFFF) + ((value >> 16) & 0xFFFF) + ((value >> 32) & 0xFFFF) + ((value >> 48) & 0xFFFF);
+                ulong value = Unsafe.ReadUnaligned<ulong>(ptr);
+                s0 += (value & 0xFFFF) + ((value >> 16) & 0xFFFF) + ((value >> 32) & 0xFFFF) + ((value >> 48) & 0xFFFF);
+                ptr += 8;
+
+                value = Unsafe.ReadUnaligned<ulong>(ptr);
+                s1 += (value & 0xFFFF) + ((value >> 16) & 0xFFFF) + ((value >> 32) & 0xFFFF) + ((value >> 48) & 0xFFFF);
+                ptr += 8;
+
+                value = Unsafe.ReadUnaligned<ulong>(ptr);
+                s2 += (value & 0xFFFF) + ((value >> 16) & 0xFFFF) + ((value >> 32) & 0xFFFF) + ((value >> 48) & 0xFFFF);
+                ptr += 8;
+
+                value = Unsafe.ReadUnaligned<ulong>(ptr);
+                s3 += (value & 0xFFFF) + ((value >> 16) & 0xFFFF) + ((value >> 32) & 0xFFFF) + ((value >> 48) & 0xFFFF);
+                ptr += 8;
                 length -= 32;
-                pseudoHeaderSum = (pseudoHeaderSum & 0xffff) + (pseudoHeaderSum >> 16);
             }
 
-            ushort* ptr16 = (ushort*)ptr64;
+            pseudoHeaderSum = s0 + s1 + s2 + s3;
             while (length > 1)
             {
-                pseudoHeaderSum += BinaryPrimitives.ReverseEndianness(*ptr16++);
+                pseudoHeaderSum += Unsafe.ReadUnaligned<ushort>(ptr);
+                ptr += 2;
                 length -= 2;
-                pseudoHeaderSum = (pseudoHeaderSum & 0xffff) + (pseudoHeaderSum >> 16);
             }
-            if (length > 0) pseudoHeaderSum += (ushort)((*ptr16) << 8);
-            while ((pseudoHeaderSum >> 16) != 0) pseudoHeaderSum = (pseudoHeaderSum & 0xffff) + (pseudoHeaderSum >> 16);
-            return BinaryPrimitives.ReverseEndianness((ushort)(~pseudoHeaderSum));
+
+            if (length > 0)
+            {
+                pseudoHeaderSum += *ptr;
+            }
+
+            while ((pseudoHeaderSum >> 16) != 0)
+            {
+                pseudoHeaderSum = (pseudoHeaderSum & 0xFFFF) + (pseudoHeaderSum >> 16);
+            }
+
+            return BinaryPrimitives.ReverseEndianness((ushort)~pseudoHeaderSum);
         }
-        /// <summary>
-        /// 计算伪头部和，如TCP/UDP校验和需要一个伪头部
-        /// </summary>
-        /// <param name="addr">IP包头开始</param>
-        /// <param name="length">TCP/UDP长度</param>
-        /// <returns></returns>
-        private static unsafe ulong PseudoHeaderSum(byte* addr, uint length)
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static unsafe ulong PseudoHeaderSum(byte* ptr, uint length, byte protocol)
         {
-            uint srcIp = BinaryPrimitives.ReverseEndianness(*(uint*)(addr + 12));
-            uint dstIp = BinaryPrimitives.ReverseEndianness(*(uint*)(addr + 16));
-            return (srcIp >> 16) + (srcIp & 0xFFFF) + (dstIp >> 16) + (dstIp & 0xFFFF) + *(addr + 9) + length;
+            return AddressPairSum(Unsafe.ReadUnaligned<ulong>(ptr + 12)) + protocol + length;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static uint AddressPairSum(ulong value)
+        {
+            value = BinaryPrimitives.ReverseEndianness(value);
+            return (uint)(ushort)value +
+                   (ushort)(value >> 16) +
+                   (ushort)(value >> 32) +
+                   (ushort)(value >> 48);
+        }
+
+
+
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static unsafe void WriteTransportChecksum(byte* ptr, int length, int offset, ulong pseudoHeaderSum)
+        {
+            WriteWord((ushort*)(ptr + offset), 0);
+            WriteWord((ushort*)(ptr + offset), ComputeChecksum(ptr, (uint)length, pseudoHeaderSum));
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong ToLittleEndianSum(ulong sum)
+        {
+            while ((sum >> 16) != 0)
+            {
+                sum = (sum & 0xFFFF) + (sum >> 16);
+            }
+
+            return BinaryPrimitives.ReverseEndianness((ushort)sum);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static unsafe ushort ReadWord(ushort* ptr) => BinaryPrimitives.ReverseEndianness(Unsafe.ReadUnaligned<ushort>(ptr));
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static unsafe void WriteWord(ushort* ptr, ushort value) => *ptr = BinaryPrimitives.ReverseEndianness(value);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ushort ReadRawWord(ref byte packetRef, int offset) => Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref packetRef, offset));
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void WriteRawWord(ref byte packetRef, int offset, ushort value) => Unsafe.WriteUnaligned(ref Unsafe.Add(ref packetRef, offset), value);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsZero(ref byte packetRef, int offset) => Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref packetRef, offset)) == 0;
+
+
+        public static unsafe bool CreateIcmpHostUnreachablePacket(Span<byte> packet)
+        {
+            if (packet.Length < 20)
+            {
+                return false;
+            }
+
+            int ipHeaderLength = (packet[0] & 0x0F) << 2;
+            if (ipHeaderLength < 20 || ipHeaderLength > packet.Length)
+            {
+                return false;
+            }
+
+            if (packet[9] != 1 || packet[ipHeaderLength] != 8)
+            {
+                return false;
+            }
+
+            int quotedLength = ipHeaderLength + 8;
+            int icmpOffset = 20;
+            int icmpLength = 8 + quotedLength;
+            int totalLength = icmpOffset + icmpLength;
+            if (totalLength > packet.Length)
+            {
+                return false;
+            }
+
+            byte tos = packet[1];
+            uint sourceAddress = BinaryPrimitives.ReadUInt32BigEndian(packet.Slice(12, 4));
+            uint destinationAddress = BinaryPrimitives.ReadUInt32BigEndian(packet.Slice(16, 4));
+
+            packet.Slice(0, quotedLength).CopyTo(packet.Slice(icmpOffset + 8, quotedLength));
+
+            packet[0] = 0x45;
+            packet[1] = tos;
+            BinaryPrimitives.WriteUInt16BigEndian(packet.Slice(2, 2), (ushort)totalLength);
+            BinaryPrimitives.WriteUInt16BigEndian(packet.Slice(4, 2), 0);
+            BinaryPrimitives.WriteUInt16BigEndian(packet.Slice(6, 2), 0);
+            packet[8] = 64;
+            packet[9] = 1;
+
+            BinaryPrimitives.WriteUInt32BigEndian(packet.Slice(12, 4), destinationAddress);
+            BinaryPrimitives.WriteUInt32BigEndian(packet.Slice(16, 4), sourceAddress);
+
+            packet[icmpOffset] = 3;
+            packet[icmpOffset + 1] = 1;
+            BinaryPrimitives.WriteUInt16BigEndian(packet.Slice(icmpOffset + 2, 2), 0);
+            packet[icmpOffset + 4] = 0;
+            packet[icmpOffset + 5] = 0;
+            packet[icmpOffset + 6] = 0;
+            packet[icmpOffset + 7] = 0;
+
+            BinaryPrimitives.WriteUInt16BigEndian(packet.Slice(10, 2), 0);
+
+            fixed (byte* ptr = packet)
+            {
+                WriteWord((ushort*)(ptr + 10), ComputeChecksum(ptr, 20));
+                WriteWord((ushort*)(ptr + icmpOffset + 2), ComputeChecksum(ptr + icmpOffset, (uint)icmpLength));
+            }
+
+            return true;
         }
     }
+
 }

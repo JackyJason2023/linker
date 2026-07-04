@@ -1,4 +1,5 @@
 ﻿using linker.libs;
+using linker.libs.extends;
 using linker.libs.timer;
 using System.Buffers;
 using System.Buffers.Binary;
@@ -11,6 +12,7 @@ namespace linker.messenger.listen
 {
     public sealed class CountryTransfer
     {
+
         private string[] countryCodes = ["--","AF", "AX", "AL", "DZ", "AS", "AD", "AO", "AI", "AQ", "AG", "AR", "AM", "AW", "AU", "AT", "AZ",
             "BS", "BH", "BD", "BB", "BY", "BE", "BZ", "BJ", "BM", "BT", "BO", "BQ", "BA", "BW", "BV", "BR", "IO", "BN", "BG", "BF", "BI",
             "CV", "KH", "CM", "CA", "KY", "CF", "TD", "CL", "CN", "CX", "CC", "CO", "KM", "CG", "CD", "CK", "CR", "CI", "HR", "CU", "CW", "CY", "CZ",
@@ -51,7 +53,7 @@ namespace linker.messenger.listen
         {
             if (
                 records.Count == 0
-                || store.GeoRegistry.Messengers.Contains(type) == false
+                || store.GeoRegistry.BlackMessengers.Contains((ushort)type) == false
                 || (store.GeoRegistry.WhiteCountry.Length == 0 && store.GeoRegistry.BlackCountry.Length == 0)
             )
             {
@@ -64,15 +66,10 @@ namespace linker.messenger.listen
 
             Span<byte> address = stackalloc byte[4];
             ip.TryWriteBytes(address, out _);
-            if (address[0] == 127 || address[0] == 10
-              || (address[0] == 172 && address[1] >= 16 && address[1] <= 31)
-              || (address[0] == 192 && address[1] == 168)
-              || (address[0] == 169 && address[1] == 254)
-              )
+            if (ip.IsPrivateIP())
             {
                 return true;
             }
-
             uint value = BinaryPrimitives.ReadUInt32BigEndian(address);
             if (ipCaches.TryGetValue(value, out bool result))
             {
@@ -182,7 +179,7 @@ namespace linker.messenger.listen
 
             using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             using FileStream fileStream = new FileStream(savePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-            using IMemoryOwner<byte> buffer = MemoryPool<byte>.Shared.Rent(65535);
+            using IMemoryOwner<byte> buffer = MemoryPool<byte>.Shared.Rent(4 * 1024);
             int readBytes = 0;
             while ((readBytes = await contentStream.ReadAsync(buffer.Memory).ConfigureAwait(false)) != 0)
             {

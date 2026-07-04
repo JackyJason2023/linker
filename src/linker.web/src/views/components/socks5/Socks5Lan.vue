@@ -2,7 +2,7 @@
     <div class="w-100">
         <div class="wrap">
             <el-table stripe  :data="state.lans" border size="small" width="100%" height="400px" @cell-dblclick="handleCellClick">
-                <el-table-column prop="IP" label="路由IP" width="120">
+                <el-table-column prop="IP" :label="$t('socks5.p2n.routeIp')" width="120">
                     <template #default="scope">
                         <template v-if="scope.row.IPEditing">
                             <el-input v-trim autofocus size="small" v-model="scope.row.IP"
@@ -16,7 +16,7 @@
                         </template>
                     </template>
                 </el-table-column>
-                <el-table-column prop="PrefixLength" label="路由掩码" width="80">
+                <el-table-column prop="PrefixLength" :label="$t('socks5.p2n.routePrefix')" width="80">
                     <template #default="scope">
                         <template v-if="scope.row.PrefixLengthEditing">
                             <el-input v-trim autofocus size="small" v-model="scope.row.PrefixLength"
@@ -30,7 +30,7 @@
                         </template>
                     </template>
                 </el-table-column>
-                <el-table-column prop="MapIP" label="目标IP" width="120">
+                <el-table-column prop="MapIP" :label="$t('socks5.p2n.dstIp')" width="120">
                     <template #default="scope">
                         <template v-if="scope.row.MapIPEditing">
                             <el-input v-trim autofocus size="small" v-model="scope.row.MapIP"
@@ -44,7 +44,7 @@
                         </template>
                     </template>
                 </el-table-column>
-                <el-table-column prop="MapPrefixLength" label="目标掩码" width="80">
+                <el-table-column prop="MapPrefixLength" :label="$t('socks5.p2n.dstPrefix')" width="80">
                     <template #default="scope">
                         <template v-if="scope.row.MapPrefixLengthEditing">
                             <el-input v-trim autofocus size="small" v-model="scope.row.MapPrefixLength"
@@ -58,7 +58,7 @@
                         </template>
                     </template>
                 </el-table-column>
-                <el-table-column prop="Remark" label="备注">
+                <el-table-column prop="Remark" :label="$t('socks5.p2n.remark')">
                     <template #default="scope">
                         <template v-if="scope.row.RemarkEditing">
                             <el-input v-trim autofocus size="small" v-model="scope.row.Remark"
@@ -71,15 +71,15 @@
                         </template>
                     </template>
                 </el-table-column>
-                <el-table-column prop="Disabled" label="禁用">
+                <el-table-column prop="Disabled" :label="$t('socks5.p2n.disabled')">
                     <template #default="scope">
-                        <el-checkbox v-model="scope.row.Disabled" label="禁用"/>
+                        <el-checkbox v-model="scope.row.Disabled" :label="$t('socks5.p2n.disabled')"/>
                     </template>
                 </el-table-column>
-                <el-table-column prop="Oper" label="操作" width="110">
+                <el-table-column prop="Oper" :label="$t('common.oper')" width="110">
                     <template #default="scope">
                         <div>
-                            <el-popconfirm title="删除不可逆，是否确认?" @confirm="handleDel(scope.$index)">
+                            <el-popconfirm :title="$t('common.delSure',[''])" @confirm="handleDel(scope.$index)">
                                 <template #reference>
                                     <el-button type="danger" size="small">
                                         <el-icon><Delete /></el-icon>

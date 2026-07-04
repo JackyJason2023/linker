@@ -16,7 +16,7 @@ namespace linker.tunnel.wanport
             buffer[0] = 0;
             buffer[1] = i;
 
-            return buffer.AsMemory(0, temp.Length);
+            return buffer.AsMemory(0, 2 + temp.Length);
         }
         protected IPEndPoint UnpackRecvData(byte[] buffer, int length)
         {
@@ -54,9 +54,9 @@ namespace linker.tunnel.wanport
                 for (byte i = 0; i < 5; i++)
                 {
                     UdpClient udpClient = new UdpClient(server.AddressFamily);
-                    udpClient.Client.ReuseBind(new IPEndPoint(IPAddress.Any, 0));
+                    udpClient.Client.ReuseBind(new IPEndPoint(server.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any, 0));
                     udpClient.Client.WindowsUdpBug();
-                    using CancellationTokenSource cts = new CancellationTokenSource(500);
+                    using CancellationTokenSource cts = new CancellationTokenSource(1000);
                     try
                     {
                         await udpClient.SendAsync(BuildSendData(buffer, i), server).ConfigureAwait(false);
@@ -114,7 +114,7 @@ namespace linker.tunnel.wanport
             byte[] buffer = ArrayPool<byte>.Shared.Rent(1024);
             using CancellationTokenSource cts = new CancellationTokenSource(5000);
             Socket socket = new Socket(server.AddressFamily, SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
-            socket.ReuseBind(new IPEndPoint(IPAddress.Any, 0));
+            socket.ReuseBind(new IPEndPoint(server.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any, 0));
             try
             {
                 await socket.ConnectAsync(server, cts.Token).ConfigureAwait(false);
@@ -122,7 +122,7 @@ namespace linker.tunnel.wanport
 
                 int length = await socket.ReceiveAsync(buffer.AsMemory(), SocketFlags.None, cts.Token).ConfigureAwait(false);
                 IPEndPoint localEP = socket.LocalEndPoint as IPEndPoint;
-                
+
                 return new TunnelWanPortEndPoint { Local = localEP, Remote = UnpackRecvData(buffer, length) };
             }
             catch (Exception ex)

@@ -1,0 +1,8 @@
+{
+    "deny.title":"connections on 【{0}】",
+    "deny.online":"Online",
+    "deny.list":"Deny list",
+    "deny.add":"Deny",
+    "deny.str":"Items",
+    "deny.remark":"Remark"
+}

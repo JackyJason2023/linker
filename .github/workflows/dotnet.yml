@@ -5,7 +5,7 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: get current date
         id: date
         run: echo "::set-output name=today::$(date +'%Y-%m-%d')"
@@ -15,17 +15,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
         with:
-          tag_name: v2.0.0
-          release_name: v2.0.0.${{ steps.date.outputs.today }}
+          tag_name: v2.0.15
+          release_name: v2.0.15.${{ steps.date.outputs.today }}
           draft: false
           prerelease: false
-          body: "1. 一些累计更新，一些BUG修复\r\n2. #92 松开打洞loading限制，允许选择中继节点\r\n3. #89 windows下利用任务计划进行进程守护，定时检查服务\r\n4. 优化客户端管理ws并发\r\n5. 减少服务器推送，减轻主服务器压力"
+          body: "1. 请勿第一时间更新，建议延后2-3个小版本\r\n2. 隧道4字节长度头改为2长度+1消息类型(data/ping/pong/fin)+1保留\r\n3. UDP隧道支持策略冗余FEC和KCP\r\n4. 重写RFC5780NAT类型检测\r\n5. 端口转发和socks5底层逻辑合并\r\n6. 更多的Task向ValueTask优化\r\n7. 支持Mesh网络\r\n8. TCP/IP校验和全量扫描200ns改为增量更新10ns\r\n9. 可能的STUN端口预测"
       - name: setup node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: lts/*
       - name: setup dotnet
-        uses: actions/setup-dotnet@v2
+        uses: actions/setup-dotnet@v4
         env:
           GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
         with:
@@ -36,14 +36,15 @@ jobs:
         run: ./shells/publish.bat "C:\\Android\\android-sdk"
       - name: upload-win-x86-oss
         id: upload-win-x86-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker-win-x86.zip
-          target-path: /downloads/linker/v2.0.0/linker-win-x86.zip
+          assets: >-
+            ./public/publish-zip/linker-win-x86.zip:/downloads/linker/v2.0.15/linker-win-x86.zip
+          timeout: '720000'
       - name: upload-win-x86
         id: upload-win-x86
         uses: actions/upload-release-asset@master
@@ -56,14 +57,15 @@ jobs:
           asset_content_type: application/zip
       - name: upload-win-x64-oss
         id: upload-win-x64-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker-win-x64.zip
-          target-path: /downloads/linker/v2.0.0/linker-win-x64.zip
+          assets: >-
+            ./public/publish-zip/linker-win-x64.zip:/downloads/linker/v2.0.15/linker-win-x64.zip
+          timeout: '720000'
       - name: upload-win-x64
         id: upload-win-x64
         uses: actions/upload-release-asset@master
@@ -76,14 +78,15 @@ jobs:
           asset_content_type: application/zip
       - name: upload-win-arm64-oss
         id: upload-win-arm64-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker-win-arm64.zip
-          target-path: /downloads/linker/v2.0.0/linker-win-arm64.zip
+          assets: >-
+            ./public/publish-zip/linker-win-arm64.zip:/downloads/linker/v2.0.15/linker-win-arm64.zip
+          timeout: '720000'
       - name: upload-win-arm64
         id: upload-win-arm64
         uses: actions/upload-release-asset@master
@@ -96,14 +99,15 @@ jobs:
           asset_content_type: application/zip
       - name: upload-linux-x64-oss
         id: upload-linux-x64-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker-linux-x64.zip
-          target-path: /downloads/linker/v2.0.0/linker-linux-x64.zip
+          assets: >-
+            ./public/publish-zip/linker-linux-x64.zip:/downloads/linker/v2.0.15/linker-linux-x64.zip
+          timeout: '720000'
       - name: upload-linux-x64
         id: upload-linux-x64
         uses: actions/upload-release-asset@master
@@ -116,14 +120,15 @@ jobs:
           asset_content_type: application/zip
       - name: upload-linux-arm-oss
         id: upload-linux-arm-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker-linux-arm.zip
-          target-path: /downloads/linker/v2.0.0/linker-linux-arm.zip
+          assets: >-
+            ./public/publish-zip/linker-linux-arm.zip:/downloads/linker/v2.0.15/linker-linux-arm.zip
+          timeout: '720000'
       - name: upload-linux-arm
         id: upload-linux-arm
         uses: actions/upload-release-asset@master
@@ -136,14 +141,15 @@ jobs:
           asset_content_type: application/zip
       - name: upload-linux-arm64-oss
         id: upload-linux-arm64-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker-linux-arm64.zip
-          target-path: /downloads/linker/v2.0.0/linker-linux-arm64.zip
+          assets: >-
+            ./public/publish-zip/linker-linux-arm64.zip:/downloads/linker/v2.0.15/linker-linux-arm64.zip
+          timeout: '720000'
       - name: upload-linux-arm64
         id: upload-linux-arm64
         uses: actions/upload-release-asset@master
@@ -156,14 +162,15 @@ jobs:
           asset_content_type: application/zip
       - name: upload-linux-musl-x64-oss
         id: upload-linux-musl-x64-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker-linux-musl-x64.zip
-          target-path: /downloads/linker/v2.0.0/linker-linux-musl-x64.zip
+          assets: >-
+            ./public/publish-zip/linker-linux-musl-x64.zip:/downloads/linker/v2.0.15/linker-linux-musl-x64.zip
+          timeout: '720000'
       - name: upload-linux-musl-x64
         id: upload-linux-musl-x64
         uses: actions/upload-release-asset@master
@@ -176,14 +183,15 @@ jobs:
           asset_content_type: application/zip
       - name: upload-linux-musl-arm-oss
         id: upload-linux-musl-arm-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker-linux-musl-arm.zip
-          target-path: /downloads/linker/v2.0.0/linker-linux-musl-arm.zip
+          assets: >-
+            ./public/publish-zip/linker-linux-musl-arm.zip:/downloads/linker/v2.0.15/linker-linux-musl-arm.zip
+          timeout: '720000'
       - name: upload-linux-musl-arm
         id: upload-linux-musl-arm
         uses: actions/upload-release-asset@master
@@ -196,14 +204,15 @@ jobs:
           asset_content_type: application/zip
       - name: upload-linux-musl-arm64-oss
         id: upload-linux-musl-arm64-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker-linux-musl-arm64.zip
-          target-path: /downloads/linker/v2.0.0/linker-linux-musl-arm64.zip
+          assets: >-
+            ./public/publish-zip/linker-linux-musl-arm64.zip:/downloads/linker/v2.0.15/linker-linux-musl-arm64.zip
+          timeout: '720000'
       - name: upload-linux-musl-arm64
         id: upload-linux-musl-arm64
         uses: actions/upload-release-asset@master
@@ -216,14 +225,15 @@ jobs:
           asset_content_type: application/zip
       - name: upload-osx-x64-oss
         id: upload-osx-x64-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker-osx-x64.zip
-          target-path: /downloads/linker/v2.0.0/linker-osx-x64.zip
+          assets: >-
+            ./public/publish-zip/linker-osx-x64.zip:/downloads/linker/v2.0.15/linker-osx-x64.zip
+          timeout: '720000'
       - name: upload-osx-x64
         id: upload-osx-x64
         uses: actions/upload-release-asset@master
@@ -236,14 +246,15 @@ jobs:
           asset_content_type: application/zip
       - name: upload-osx-arm64-oss
         id: upload-osx-arm64-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker-osx-arm64.zip
-          target-path: /downloads/linker/v2.0.0/linker-osx-arm64.zip
+          assets: >-
+            ./public/publish-zip/linker-osx-arm64.zip:/downloads/linker/v2.0.15/linker-osx-arm64.zip
+          timeout: '720000'
       - name: upload-osx-arm64
         id: upload-osx-arm64
         uses: actions/upload-release-asset@master
@@ -254,36 +265,67 @@ jobs:
           asset_path: ./public/publish-zip/linker-osx-arm64.zip
           asset_name: linker-osx-arm64.zip
           asset_content_type: application/zip
+      - name: upload-anywhere-oss
+        id: upload-anywhere-oss
+        uses: lslzl3000/oss-action@v1.0.1
+        with:
+          region: oss-cn-shenzhen
+          key-id: ${{ secrets.ALIYUN_OSS_ID }}
+          key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
+          bucket: ide-qbcode
+          assets: >-
+            ./public/publish-zip/linker-anywhere.zip:/downloads/linker/v2.0.15/linker-anywhere.zip
+          timeout: '720000'
+      - name: upload-anywhere
+        id: upload-anywhere
+        uses: actions/upload-release-asset@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./public/publish-zip/linker-anywhere.zip
+          asset_name: linker-anywhere.zip
+          asset_content_type: application/zip
+      - name: upload-version-oss
+        id: upload-version-oss
+        uses: lslzl3000/oss-action@v1.0.1
+        with:
+          region: oss-cn-shenzhen
+          key-id: ${{ secrets.ALIYUN_OSS_ID }}
+          key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
+          bucket: ide-qbcode
+          assets: ./version.txt:/downloads/linker/version.txt
+          timeout: '720000'
       - name: upload-install-service-oss
         id: upload-install-service-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./src/linker/linker.service
-          target-path: /downloads/linker/linker.service
+          assets: ./src/linker/linker.service:/downloads/linker/linker.service
+          timeout: '720000'
       - name: upload-install-oss
         id: upload-install-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./src/linker/linker-install.sh
-          target-path: /downloads/linker/linker-install.sh
+          assets: ./src/linker/linker-install.sh:/downloads/linker/linker-install.sh
+          timeout: '720000'
       - name: upload-apk-oss
         id: upload-apk-oss
-        uses: tvrcgo/oss-action@v0.1.1
+        uses: lslzl3000/oss-action@v1.0.1
         with:
           region: oss-cn-shenzhen
           key-id: ${{ secrets.ALIYUN_OSS_ID }}
           key-secret: ${{ secrets.ALIYUN_OSS_SECRET }}
           bucket: ide-qbcode
-          asset-path: ./public/publish-zip/linker.apk
-          target-path: /downloads/linker/v2.0.0/linker.apk
+          assets: ./public/publish-zip/linker.apk:/downloads/linker/v2.0.15/linker.apk
+          timeout: '720000'
       - name: upload-apk
         id: upload-apk
         uses: actions/upload-release-asset@master

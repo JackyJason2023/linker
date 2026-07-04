@@ -1,6 +1,5 @@
 ﻿using linker.libs;
 using linker.libs.extends;
-using System;
 using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
@@ -20,26 +19,54 @@ namespace linker.messenger.listen
             this.resolverTransfer = resolverTransfer;
             this.countryTransfer = countryTransfer;
             cancellationTokenSource = new CancellationTokenSource();
-
         }
 
-        public void Start(int port)
+        public void Start(int port, bool ipv6 = false)
         {
-            if (port <= 0) return;
+            if (port <= 0)
+            {
+                return;
+            }
             if (socket == null)
             {
-                socket = BindAccept(port);
+                IPEndPoint localEndPoint = ipv6 ? new IPEndPoint(IPAddress.IPv6Any, port) : new IPEndPoint(IPAddress.Any, port);
+                _ = BindTcp(localEndPoint);
+                _ = BindUdp(localEndPoint);
             }
         }
-
-        private async Task BindUdp(int port)
+        private async Task BindTcp(IPEndPoint localEndPoint)
         {
-            IPEndPoint localEndPoint = new IPEndPoint(IPAddress.IPv6Any, port);
+            socket = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            socket.IPv6Only(localEndPoint.AddressFamily, false);
+            socket.Bind(localEndPoint);
+            socket.Listen(int.MaxValue);
+
+            while (true)
+            {
+                try
+                {
+                    var acceptTask = await socket.AcceptAsync(cancellationTokenSource.Token).ConfigureAwait(false);
+                    if (acceptTask != null && acceptTask.RemoteEndPoint != null)
+                    {
+                        _ = BeginReceive(acceptTask).ConfigureAwait(false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                    {
+                        LoggerHelper.Instance.Debug($"tcp server accept {ex}");
+                    }
+                }
+            }
+        }
+        private async Task BindUdp(IPEndPoint localEndPoint)
+        {
             socketUdp = new Socket(localEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            socketUdp.IPv6Only(localEndPoint.AddressFamily, false);
             socketUdp.Bind(localEndPoint);
-            socketUdp.IPv6Only(socketUdp.AddressFamily, false);
             socketUdp.WindowsUdpBug();
-            IPEndPoint endPoint = new IPEndPoint(IPAddress.IPv6Any, IPEndPoint.MinPort);
+            IPEndPoint endPoint = localEndPoint.AddressFamily == AddressFamily.InterNetworkV6 ? new IPEndPoint(IPAddress.IPv6Any, IPEndPoint.MinPort) : new IPEndPoint(IPAddress.Any, IPEndPoint.MinPort);
             using IMemoryOwner<byte> buffer = MemoryPool<byte>.Shared.Rent(65535);
             while (true)
             {
@@ -51,7 +78,7 @@ namespace linker.messenger.listen
                         LoggerHelper.Instance.Error($"udp server recv 0");
                         continue;
                     }
-                    IPEndPoint ep = result.RemoteEndPoint as IPEndPoint;
+                    IPEndPoint ep = (result.RemoteEndPoint as IPEndPoint).MapToIPv4();
                     try
                     {
                         if (countryTransfer.Test(buffer.Memory.Span[0], ep.Address) == false)
@@ -74,91 +101,51 @@ namespace linker.messenger.listen
             }
         }
 
-        private Socket BindAccept(int port)
-        {
-            IPEndPoint localEndPoint = new IPEndPoint(IPAddress.IPv6Any, port);
-            Socket socket = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            socket.IPv6Only(localEndPoint.AddressFamily, false);
-            socket.Bind(localEndPoint);
-            socket.Listen(int.MaxValue);
-
-            SocketAsyncEventArgs acceptEventArg = new SocketAsyncEventArgs
-            {
-                UserToken = socket,
-                SocketFlags = SocketFlags.None,
-            };
-            acceptEventArg.Completed += IO_Completed;
-            StartAccept(acceptEventArg);
-
-            _ = BindUdp(port);
-            return socket;
-        }
-        private void StartAccept(SocketAsyncEventArgs acceptEventArg)
-        {
-            acceptEventArg.AcceptSocket = null;
-            Socket token = (Socket)acceptEventArg.UserToken;
-            try
-            {
-                if (token.AcceptAsync(acceptEventArg) == false)
-                {
-                    ProcessAccept(acceptEventArg);
-                }
-            }
-            catch (Exception)
-            {
-                token?.SafeClose();
-            }
-        }
-        private void IO_Completed(object sender, SocketAsyncEventArgs e)
-        {
-            switch (e.LastOperation)
-            {
-                case SocketAsyncOperation.Accept:
-                    ProcessAccept(e);
-                    break;
-                default:
-                    break;
-            }
-        }
-        private void ProcessAccept(SocketAsyncEventArgs e)
-        {
-            if (e.AcceptSocket != null)
-            {
-                BeginReceive(e.AcceptSocket).ConfigureAwait(false);
-                StartAccept(e);
-            }
-        }
         private async Task BeginReceive(Socket socket)
         {
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(32);
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(1024);
             using CancellationTokenSource cts = new CancellationTokenSource(5000);
             try
             {
-                if (socket == null || socket.RemoteEndPoint == null)
+                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                 {
-                    return;
+                    LoggerHelper.Instance.Debug($"tcp server connect from {socket.RemoteEndPoint}");
                 }
-
                 int length = await socket.ReceiveAsync(buffer.AsMemory(0, 1), SocketFlags.None, cts.Token).ConfigureAwait(false);
-                byte type = buffer[0];
-                if (countryTransfer.Test(type, (socket.RemoteEndPoint as IPEndPoint).Address) == false)
+                if (length == 0)
                 {
                     cts.Cancel();
                     socket.SafeClose();
                     return;
                 }
-                _ = resolverTransfer.BeginReceive(type, socket);
+
+                byte type = buffer[0];
+                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                {
+                    LoggerHelper.Instance.Debug($"tcp server got {type} from {socket.RemoteEndPoint}");
+                }
+                if (countryTransfer.Test(type, (socket.RemoteEndPoint as IPEndPoint).Address.MapToIPv4()) == false)
+                {
+                    cts.Cancel();
+                    socket.SafeClose();
+                    return;
+                }
+                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                {
+                    LoggerHelper.Instance.Debug($"tcp server begin recv {type} with {socket.RemoteEndPoint}");
+                }
+                _ = resolverTransfer.BeginReceive(type, socket).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
                 cts.Cancel();
+                socket.SafeClose();
                 if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
                     LoggerHelper.Instance.Error(ex);
-
-                socket.SafeClose();
             }
             finally
             {
+
                 ArrayPool<byte>.Shared.Return(buffer);
             }
         }
@@ -168,10 +155,8 @@ namespace linker.messenger.listen
             cancellationTokenSource?.Cancel();
             socket?.SafeClose();
             socket = null;
-        }
-        public void Disponse()
-        {
-            Stop();
+            socketUdp?.SafeClose();
+            socketUdp = null;
         }
     }
 }

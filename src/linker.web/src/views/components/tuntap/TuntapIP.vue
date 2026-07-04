@@ -1,26 +1,50 @@
 <template>
     <div class="wrap">
         <el-form ref="ruleFormRef" :model="state.ruleForm" :rules="state.rules" label-width="8rem">
-            <el-form-item label="网卡ID" prop="Guid" v-if="state.showGuid">
-                <el-input v-trim v-model="state.ruleForm.Guid" style="width:14rem" disabled />
-                <el-button  @click="handleNewId" class="mgl-1">新ID</el-button>
+            <el-form-item :label="$t('tuntap.id')" prop="Guid" v-if="state.showGuid">
+                <el-input v-trim v-model="state.ruleForm.Guid" class="w-14" disabled />
+                <el-button  @click="handleNewId" class="mgl-1"><el-icon><Refresh></Refresh></el-icon></el-button>
             </el-form-item>
-            <el-form-item label="网卡名" prop="Name">
-                <el-input v-trim v-model="state.ruleForm.Name" style="width:14rem" />
-                <span class="mgl-1">留空则使用【本组网络】的设置</span>
+            <el-form-item :label="$t('tuntap.name')" prop="Name">
+                <el-input v-trim v-model="state.ruleForm.Name" class="w-14" />
+                <span class="mgl-1">{{ $t('tuntap.empty') }}</span>
             </el-form-item>
-            <el-form-item label="网卡IP" prop="IP" class="mgb-0">
-                <el-input v-trim v-model="state.ruleForm.IP" style="width:14rem" />
-                    <span>/</span>
-                    <el-input v-trim @change="handlePrefixLengthChange" v-model="state.ruleForm.PrefixLength" style="width:4rem" />
+            <el-form-item label="MTU" prop="MTU">
+                <el-select v-model="state.ruleForm.Mtu" class="w-14">
+                    <el-option :value="item.value" :label="item.label" v-for="(item,index) in state.mtus"></el-option>
+                </el-select>
+                <span class="mgl-1">{{ $t('tuntap.empty') }}</span>
+            </el-form-item>
+            <el-form-item :label="$t('tuntap.mss')" prop="MssFix">
+                <el-select v-model="state.ruleForm.MssFix" class="w-14">
+                    <el-option :value="item.value" :label="item.label" v-for="(item,index) in state.msss"></el-option>
+                </el-select>
+                <span class="mgl-1">{{ $t('tuntap.empty') }}</span>
+            </el-form-item>
+            <el-form-item :label="$t('tuntap.subnet')" prop="NetworkName">
+                <el-select v-model="state.ruleForm.NetworkName"  class="w-14">
+                    <el-option :value="item.value" :label="item.label" v-for="(item,index) in state.networks"></el-option>
+                </el-select>
+                <span class="mgl-1">{{$t('tuntap.subnetText')}}</span>
+            </el-form-item>
+            <el-form-item :label="$t('tuntap.segment')" prop="VlsmStatus">
+                <el-select v-model="state.ruleForm.VlsmStatus" class="w-14">
+                    <el-option :value="item.value" :label="item.label" v-for="(item,index) in state.vlsms"></el-option>
+                </el-select>
+                <span class="mgl-1">{{ $t('tuntap.empty') }}</span>
+            </el-form-item>
+            <el-form-item :label="$t('tuntap.ip')" prop="IP">
+                <el-input v-trim v-model="state.ruleForm.IP" class="w-14" />
+                <span> / </span>
+                <el-input v-trim @change="handlePrefixLengthChange" v-model="state.ruleForm.PrefixLength" class="w-4" />
             </el-form-item>
             <el-form-item label="" class="mgb-0">
-                    <el-checkbox class="mgr-1" v-model="state.ruleForm.ShowDelay" label="显示延迟" size="large" />
-                    <el-checkbox class="mgr-1" v-model="state.ruleForm.AutoConnect" label="自动连接" size="large" />
-                    <el-checkbox class="mgr-1" v-model="state.ruleForm.Multicast" label="禁用广播" size="large" />
-                    <el-checkbox class="mgr-1" v-model="state.ruleForm.DisableNat" label="禁用NAT" size="large" />
-                    <el-checkbox class="mgr-1" v-model="state.ruleForm.InterfaceOrder" label="网卡顺序" size="large" />
-                    <el-checkbox class="mgr-1" v-model="state.ruleForm.SrcProxy" label="TCP转代理" size="large" />
+                    <el-checkbox class="mgr-1" v-model="state.ruleForm.ShowDelay" :label="$t('tuntap.delay')" size="large" />
+                    <el-checkbox class="mgr-1" v-model="state.ruleForm.AutoConnect" :label="$t('tuntap.auto')" size="large" />
+                    <el-checkbox class="mgr-1" v-model="state.ruleForm.Multicast" :label="$t('tuntap.multicast')" size="large" />
+                    <el-checkbox class="mgr-1" v-model="state.ruleForm.DisableNat" :label="$t('tuntap.nat')" size="large" />
+                    <el-checkbox class="mgr-1" v-model="state.ruleForm.InterfaceOrder" :label="$t('tuntap.order')" size="large" />
+                    <el-checkbox class="mgr-1" v-model="state.ruleForm.SrcProxy" :label="$t('tuntap.srcProxy')" size="large" />
             </el-form-item>
         </el-form>
     </div>
@@ -31,14 +55,16 @@ import { useTuntap } from './tuntap';
 import TuntapForward from './TuntapForward.vue'
 import TuntapLan from './TuntapLan.vue'
 import { Delete, Plus, Warning, Refresh } from '@element-plus/icons-vue'
-import { getid, setid } from '@/apis/tuntap';
+import { getid, getNetwork, setid } from '@/apis/tuntap';
 import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n';
 export default {
     emits: ['change'],
     components: { Delete, Plus, Warning, Refresh,TuntapForward ,TuntapLan},
     setup(props, { emit }) {
         
 
+        const {t} = useI18n();
         const tuntap = useTuntap();
 
         const ruleFormRef = ref(null);
@@ -59,18 +85,68 @@ export default {
                 SrcProxy: tuntap.value.current.SrcProxy,
                 Forwards: tuntap.value.current.Forwards,
                 Name: tuntap.value.current.Name,
+                NetworkName: tuntap.value.current.NetworkName,
+                Mtu: tuntap.value.current.Mtu,
+                MssFix: tuntap.value.current.MssFix,
+                VlsmStatus: tuntap.value.current.VlsmStatus,
                 Guid: '',
             },
             rules: {
                 Name: {
                     type: 'string',
                     pattern: /^$|^[A-Za-z][A-Za-z0-9]{0,31}$/,
-                    message:'请输入正确的网卡名',
+                    message:t('tuntap.validate'),
                     transform(value) {
                         return value.trim();
                     },
                 }
-            }
+            },
+            networks:[],
+            vlsms:[
+                {value:0,label:''},
+                {value:1,label:`${t('tuntap.master')} <-/->${t('tuntap.subnet')}`},
+                {value:2,label:`${t('tuntap.master')}  -->${t('tuntap.subnet')}`},
+                {value:4,label:`${t('tuntap.master')} <--> ${t('tuntap.subnet')}`},
+            ],
+            mtus:[
+                {value:0,label:''},
+                {value:1480,label:'1480'},
+                {value:1460,label:'1460'},
+                {value:1440,label:'1440'},
+                {value:1420,label:'1420'},
+                {value:1400,label:'1400'},
+                {value:1380,label:'1380'},
+                {value:1360,label:'1360'},
+                {value:1340,label:'1340'},
+                {value:1320,label:'1320'},
+                {value:1300,label:'1300'},
+                {value:1280,label:'1280'},
+                {value:1260,label:'1260'},
+                {value:1240,label:'1240'},
+                {value:1220,label:'1220'},
+                {value:1200,label:'1200'}
+            ],
+            msss:[
+                {value:0,label:''},
+                {value:1,label:''},
+                {value:2,label:''},
+                {value:3,label:''},
+                {value:4,label:''},
+                {value:5,label:''},
+                {value:6,label:t('tuntap.unset')},
+                {value:7,label:t('tuntap.clamp')},
+                {value:1400,label:'1400'},
+                {value:1380,label:'1380'},
+                {value:1360,label:'1360'},
+                {value:1340,label:'1340'},
+                {value:1320,label:'1320'},
+                {value:1300,label:'1300'},
+                {value:1280,label:'1280'},
+                {value:1260,label:'1260'},
+                {value:1240,label:'1240'},
+                {value:1220,label:'1220'},
+                {value:1200,label:'1200'}
+            ]
         });
         const handlePrefixLengthChange = () => {
             var value = +state.ruleForm.PrefixLength;
@@ -82,14 +158,13 @@ export default {
         const handleNewId = () => {
             state.ruleForm.Guid =  crypto.randomUUID();
             setid({key:tuntap.value.current.device.MachineId,value:state.ruleForm.Guid}).then(res=>{ 
-                ElMessage.success('已操作')
+                ElMessage.success(t('common.opered'))
             }).catch(()=>{
-                ElMessage.error('操作失败！');
+                ElMessage.error(t('common.operFail'));
             });
         }
 
         const getData = ()=>{
-            console.log(tuntap.value.current);
             const json = JSON.parse(JSON.stringify(tuntap.value.current,(key,value)=> key =='device'?'':value ));
             json.IP = state.ruleForm.IP.replace(/\s/g, '') || '0.0.0.0';
             json.PrefixLength = +state.ruleForm.PrefixLength;
@@ -104,6 +179,10 @@ export default {
             json.FakeAck = state.ruleForm.FakeAck;
             json.SrcProxy = state.ruleForm.SrcProxy;
             json.Name = state.ruleForm.Name;
+            json.NetworkName = state.ruleForm.NetworkName;
+            json.Mtu = state.ruleForm.Mtu;
+            json.MssFix = state.ruleForm.MssFix;
+            json.VlsmStatus = state.ruleForm.VlsmStatus;
 
             return json;
         }
@@ -111,6 +190,10 @@ export default {
         onMounted(()=>{
             getid(tuntap.value.current.device.MachineId).then(res=>{
                 state.ruleForm.Guid = res;
+            });
+            getNetwork().then(res=>{
+                state.networks = [{value:'default',label:t('tuntap.master')}]
+                .concat(res.Subs.reduce((a,b)=>a.concat([{value:b.Name,label:`${b.Name}->${b.IP}/${b.PrefixLength}`}]),[]));
             });
         })
 

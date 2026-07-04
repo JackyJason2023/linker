@@ -1,4 +1,4 @@
-import { getSignInList, setSignInOrder } from "@/apis/signin";
+import { getSignInList } from "@/apis/signin";
 import { injectGlobalData } from "@/provide";
 import { computed, inject, nextTick, provide, reactive, ref } from "vue";
 
@@ -9,17 +9,22 @@ export const provideDevices = () => {
     const machineId = computed(() => globalData.value.config.Client.Id);
     const hasFullList = computed(() => globalData.value.hasAccess('FullList'));
 
-    const ps = +(localStorage.getItem('ps') || '10');
-    const count = +(localStorage.getItem('device-count') || '10');
+    const ps = +(localStorage.getItem('ps') || '255');
+    const count = +(localStorage.getItem('device-count') || '255');
+    const prop = localStorage.getItem('prop') || '';
+    const asc =  (localStorage.getItem('asc') || 'false') == 'true';
+    const name = localStorage.getItem('search-name');
+    
     const devices = reactive({
         timer: 0,
         timer1: 0,
         page: {
             Request: {
-                Page: 1, Size: ps, Name: '', Ids: [], Prop: '', Asc: true
+                Page: 1, Size: ps, Name: name, Ids: [], Asc: asc, Prop: prop
             },
             Count: count,
-            List: Array(count).fill().map(c=>{ return {}})
+            List: Array(count).fill().map(c=>{ return {}}),
+            _list:[]
         },
         loadTimer:0,
 
@@ -27,7 +32,6 @@ export const provideDevices = () => {
         showAccessEdit: false,
         deviceInfo: null
     });
-
     provide(deviceSymbol, devices);
 
     const hooks = {};
@@ -58,6 +62,8 @@ export const provideDevices = () => {
                 hook.refresh = false;
                 hook.refreshFn(devices.page.List);
             });
+            await Promise.all(Object.values(hooks).map(hook=>dataFn(hook)));
+            
 
             const changeds = Object.values(hooks).filter(c=>c.changed);
             changeds.forEach(hook=>{ hook.changed=false });
@@ -68,27 +74,26 @@ export const provideDevices = () => {
                         const json = {_index:i};
                         for(let j = 0; j < changeds.length; j++) {
                             const hook = changeds[j];
-                            hook.processFn(devices.page.List[i],json);
+                            hook.processFn(device,json);
                         }
-                        Object.assign(devices.page.List[i], json);
+                        Object.assign(device, json);
                     }
                 }
+                _handleSort();
             }
-            
-            await Promise.all(Object.values(hooks).map(hook=>dataFn(hook)));
-
+           
             devices.timer1 = setTimeout(fn,1000);
         }
         fn();
     }
-    startHooks();
 
     const deviceStartProcess = () => { 
         _getSignList().then(()=>{
-            startHooks();
+            setTimeout(startHooks,100);
             _getSignList1();
         });
     }
+
     const _getSignList = () => {
         return new Promise((resolve, reject) => { 
             getSignInList(devices.page.Request).then((res) => {
@@ -98,27 +103,45 @@ export const provideDevices = () => {
                     res.List = res.List.filter(c=>c.MachineId == machineId.value);
                     res.Count = 1;
                 }
-                devices.page.Request = res.Request;
-                devices.page.Count = res.Count;
                 
                 for (let j in res.List) {
-                    
-                    Object.assign(res.List[j], {
-                        showDel: machineId.value != res.List[j].MachineId && res.List[j].Connected == false,
-                        showAccess: machineId.value != res.List[j].MachineId && res.List[j].Connected,
-                        showReboot: res.List[j].Connected,
-                        isSelf: machineId.value == res.List[j].MachineId,
-                        animationDelay: j*50
+                    const item = res.List[j];
+                    Object.assign(item, {
+                        showDel: machineId.value != item.MachineId && item.Connected == false,
+                        showAccess: machineId.value != item.MachineId && item.Connected,
+                        showReboot: item.Connected,
+                        isSelf: machineId.value == item.MachineId,
+                        avatar: item.Args['avatar'] || '{}',
+                        animationDelay:0,
                     });
-                    if (res.List[j].isSelf) {
-                        globalData.value.self = res.List[j];
+                    if (item.isSelf) {
+                        globalData.value.self = item;
                     }
+                    if(item.avatar.startsWith('http') == false){    
+                        try{
+                            item.avatar_ = JSON.parse(item.avatar || "{}");
+                            item.avatar_style = `
+                            line-height: 0;
+                            font-family:${item.avatar_.ff || 'auto'};
+                            font-size:${item.avatar_.fs||'none'};
+                            color:${item.avatar_.fc || 'none'};
+                            background-color:${item.avatar_.bc || 'none'}
+                            `;
+                            item.avatar_text = item.avatar_.ft ||  item.MachineName.split('')[0];
+                        }catch(e){}
+                    }else{
+                        item.avatar_url = item.avatar;
+                    }
+                    
                 }
+                devices.page.Request = res.Request;
+                devices.page.Count = res.Count;
                 devices.page.List = res.List;
+                devices.page._list = res.List.slice(0);
                 for(let name in hooks) {
                     hooks[name].changed = true;
                 }
-
+                
                 localStorage.setItem('device-count',devices.page.Count);
                 nextTick(()=>{
                     window.dispatchEvent(new Event('resize'));
@@ -148,6 +171,7 @@ export const provideDevices = () => {
                     }
                 }
             }
+            _handleSort();
             devices.timer = setTimeout(_getSignList1, 5000);
         }).catch((err) => {
             devices.timer = setTimeout(_getSignList1, 5000);
@@ -156,17 +180,18 @@ export const provideDevices = () => {
     const handlePageChange = (page) => {
         if (page) {
             devices.page.Request.Page = page;
+            clearTimeout(devices.loadTimer);
+            devices.loadTimer = setTimeout(_getSignList,300);
         }
-        clearTimeout(devices.loadTimer);
-        devices.loadTimer = setTimeout(_getSignList,300);
     }
     const handlePageSizeChange = (size) => {
         if (size) {
             devices.page.Request.Size = size;
             localStorage.setItem('ps', size);
+            clearTimeout(devices.loadTimer);
+            devices.loadTimer = setTimeout(_getSignList,300);
         }
-        clearTimeout(devices.loadTimer);
-        devices.loadTimer = setTimeout(_getSignList,300);
+       
     }
     const deviceClearTimeout = () => {
         clearTimeout(devices.timer);
@@ -175,12 +200,73 @@ export const provideDevices = () => {
         devices.timer1 = 0;
     }
 
-    const setSort = (ids) => {
-        return setSignInOrder(ids);
+    const _handleSort = ()=>{
+        const prop = devices.page.Request.Prop;
+        const asc = devices.page.Request.Asc;
+        let list = devices.page._list.slice(1);
+        switch(prop){
+            case 'machineName':
+                list = asc 
+                ? list.sort((a,b)=> a.MachineName.localeCompare(b.MachineName))
+                : list.sort((a,b)=> b.MachineName.localeCompare(a.MachineName));
+            break;
+            case 'version':
+                list = asc 
+                ? list.sort((a,b)=> a.Version.localeCompare(b.Version))
+                : list.sort((a,b)=> b.Version.localeCompare(a.Version));
+            break;
+            case 'tunnel':
+                try{
+                list = asc 
+                    ? list.sort((a,b)=> a.hook_tunnel_sort - b.hook_tunnel_sort )
+                    : list.sort((a,b)=> b.hook_tunnel_sort - a.hook_tunnel_sort);
+                }catch(e){}     
+            break;
+            case 'tuntap':
+                try{
+                    list = asc
+                    ? list.sort((a,b)=> a.hook_tuntap_sort.localeCompare(b.hook_tuntap_sort))
+                    : list.sort((a,b)=> b.hook_tuntap_sort.localeCompare(a.hook_tuntap_sort));  
+                }catch(e){}          
+            break;
+            case 'forward':
+                try{
+                    list = asc
+                    ? list.sort((a,b)=> a.hook_counter_forward_sort.localeCompare(b.hook_counter_forward_sort))
+                    : list.sort((a,b)=> b.hook_counter_forward_sort.localeCompare(a.hook_counter_forward_sort));  
+                }catch(e){}          
+            break;
+            case 'oper':
+                try{
+                    list = asc
+                    ? list.sort((a,b)=> a.hook_counter_oper_sort.localeCompare(b.hook_counter_oper_sort))
+                    : list.sort((a,b)=> b.hook_counter_oper_sort.localeCompare(a.hook_counter_oper_sort));  
+                }catch(e){}          
+            break;
+            
+            default:
+            break;
+
+        }
+        list =  list.sort((a,b)=> b.Connected - a.Connected);    
+        if(devices.page._list.length > 0){
+            list.splice(0,0,devices.page._list[0]);
+        }
+        devices.page.List = list;
+    }
+    const handleSort = () => {
+        localStorage.setItem('prop',devices.page.Request.Prop);
+        localStorage.setItem('asc',devices.page.Request.Asc);   
+        _handleSort();
+    }
+    const handleSearch = () => { 
+        localStorage.setItem('search-name',devices.page.Request.Name || '');
+        clearTimeout(devices.loadTimer);
+        devices.loadTimer = setTimeout(_getSignList,300);
     }
 
     return {
-        devices,deviceAddHook,deviceRefreshHook, deviceStartProcess, handlePageChange, handlePageSizeChange, deviceClearTimeout, setSort
+        devices,deviceAddHook,deviceRefreshHook, deviceStartProcess, handlePageChange, handlePageSizeChange, deviceClearTimeout, handleSort,handleSearch
     }
 }
 export const useDevice = () => {

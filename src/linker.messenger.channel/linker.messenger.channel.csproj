@@ -15,9 +15,9 @@
 		<PackageProjectUrl>https://github.com/snltty/linker</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/snltty/linker</RepositoryUrl>
 		<PackageReleaseNotes>linker messenger channel</PackageReleaseNotes>
-		<Version>1.9.9</Version>
-		<AssemblyVersion>1.9.9</AssemblyVersion>
-		<FileVersion>1.9.9</FileVersion>
+		<Version>2.0.15</Version>
+		<AssemblyVersion>2.0.15</AssemblyVersion>
+		<FileVersion>2.0.15</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -37,7 +37,7 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\linker.libs\linker.libs.csproj" />
-		<ProjectReference Include="..\linker.messenger.pcp\linker.messenger.pcp.csproj" />
+		<ProjectReference Include="..\linker.messenger.mesh\linker.messenger.mesh.csproj" />
 		<ProjectReference Include="..\linker.messenger.relay\linker.messenger.relay.csproj" />
 		<ProjectReference Include="..\linker.messenger.signin\linker.messenger.signin.csproj" />
 		<ProjectReference Include="..\linker.messenger.tunnel\linker.messenger.tunnel.csproj" />

@@ -1,18 +1,17 @@
 <template>
     <el-dropdown>
         <span class="el-dropdown-link" :class="{connected:state.connected}">
-            <el-icon class="left"><Avatar /></el-icon>
-            <span>{{state.groupName|| '未知'}}</span>
+            <span>{{(state.groupName|| $t('common.unknow')).substr(0,6)}}</span>
             <el-icon class="right"><ArrowDown /></el-icon>
         </span>
         <template #dropdown>
             <el-dropdown-menu>
                 <AccessShow value="Group">
-                     <el-dropdown-item v-for="item in state.groups" @click="handleGroupChange(item.Id)">{{item.Name || '未知'}}</el-dropdown-item>
-                    <el-dropdown-item @click="handleGroups"><el-icon><Setting /></el-icon>{{$t('status.group')}}</el-dropdown-item>
-                    <el-dropdown-item @click="handleShare"><el-icon><Share /></el-icon>{{$t('status.groupShare')}}</el-dropdown-item>
+                     <el-dropdown-item v-for="item in state.groups" @click="handleGroupChange(item.Id)">{{item.Name || $t('common.unknow')}}</el-dropdown-item>
+                    <el-dropdown-item @click="handleGroups"><el-icon><Setting /></el-icon>{{$t('group')}}</el-dropdown-item>
+                    <el-dropdown-item @click="handleShare"><el-icon><Share /></el-icon>{{$t('group.share')}}</el-dropdown-item>
                 </AccessShow>
-                <el-dropdown-item @click="handleJoin"><el-icon><Plus /></el-icon>{{$t('status.groupPlus')}}</el-dropdown-item>
+                <el-dropdown-item @click="handleJoin"><el-icon><Plus /></el-icon>{{$t('group.join')}}</el-dropdown-item>
             </el-dropdown-menu>
         </template>
     </el-dropdown>
@@ -59,7 +58,7 @@ export default {
             }).then(() => {
                 state.loading = false;
                 state.show = false;
-                ElMessage.success(t('common.oper'));
+                ElMessage.success(t('common.opered'));
                 setTimeout(()=>{
                     window.location.reload();
                 },1000);
@@ -86,13 +85,13 @@ export default {
             })
         }
         const handleJoin = ()=>{
-            ElMessageBox.prompt(t('status.groupPlus'), t('common.tips'), {
+            ElMessageBox.prompt(t('group.join'), t('common.tips'), {
                 confirmButtonText:  t('common.confirm'),
                 cancelButtonText: t('common.cancel'),
             }).then(({ value }) => {
                 joinGroup(value).then((res)=>{
                     if(res){
-                         ElMessage.success(t('common.oper'));
+                         ElMessage.success(t('common.opered'));
                         setTimeout(()=>{
                             window.location.reload();
                         },1000);
@@ -113,16 +112,11 @@ export default {
 }
 </script>
 <style lang="stylus" scoped>
-.el-dropdown{vertical-align: inherit;margin-right:1rem}
-
-    .el-dropdown-link{   
-        &.connected {
-            color:green;font-weight:bold;
-        }
-        .el-icon{
-            vertical-align:top;
-        }
-    }  
-    
-
+.el-dropdown-link{   
+    &.connected {
+        color:green;
+    }
+    .el-icon{vertical-align: middle;}
+    span{display: inline-flex;align-items: center;line-height: 1;}
+}  
 </style>

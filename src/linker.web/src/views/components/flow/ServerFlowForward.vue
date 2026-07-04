@@ -1,29 +1,29 @@
 <template>
-    <el-dialog :title="$t('status.flowForward')" class="options-center" top="1vh" destroy-on-close v-model="state.show" width="90%">
+    <el-dialog append-to=".app-wrap" :title="$t('flow.forward')" class="options-center" top="1vh" destroy-on-close v-model="state.show" width="80rem">
         <div>
             <el-table :data="state.list" stripe border size="small" width="100%" height="60vh" @sort-change="handleSort">
-                <el-table-column prop="Key" :label="$t('status.flowMachineName')" width="100">
+                <el-table-column prop="Key" :label="$t('flow.src.name')" width="100">
                     <template #default="scope">
                         <span>{{ state.names[scope.row.Key] || 'unknow' }}</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="Target" :label="$t('status.flowTarget')" width="120"></el-table-column>
-                <el-table-column prop="SendtBytes" :label="$t('status.flowUpload')" sortable="custom">
+                <el-table-column prop="Target" :label="$t('flow.dst')" width="120"></el-table-column>
+                <el-table-column prop="SendtBytes" :label="$t('flow.upload')" sortable="custom">
                     <template #default="scope">
                         <span>{{ scope.row.SendtBytesText }}</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="DiffSendtBytes" :label="$t('status.flowUpload')" sortable="custom">
+                <el-table-column prop="DiffSendtBytes" :label="$t('flow.upload')" sortable="custom">
                     <template #default="scope">
                         <span>{{ scope.row.DiffSendtBytesText }}/s</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="ReceiveBytes" :label="$t('status.flowDownload')" sortable="custom">
+                <el-table-column prop="ReceiveBytes" :label="$t('flow.download')" sortable="custom">
                     <template #default="scope">
                         <span>{{ scope.row.ReceiveBytesText }}</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="DiffReceiveBytes" :label="$t('status.flowDownload')" sortable="custom">
+                <el-table-column prop="DiffReceiveBytes" :label="$t('flow.download')" sortable="custom">
                     <template #default="scope">
                         <span>{{ scope.row.DiffReceiveBytesText }}/s</span>
                     </template>

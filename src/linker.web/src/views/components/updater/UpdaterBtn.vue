@@ -6,22 +6,22 @@
                     <span>{{item.Version}}</span>
                     <template v-if="item.hook_updater">
                         <template v-if="item.hook_updater.Status == 1">
-                            <el-icon size="14" class="loading"><Loading /></el-icon>
+                            <el-icon size="12" class="loading"><Loading /></el-icon>
                         </template>
                         <template v-else-if="item.hook_updater.Status == 2">
-                            <el-icon size="14"><Download /></el-icon>
+                            <el-icon size="12"><Download /></el-icon>
                         </template>
                         <template v-else-if="item.hook_updater.Status == 3 || item.hook_updater.Status == 5">
-                            <el-icon size="14" class="loading"><Loading /></el-icon>
+                            <el-icon size="12" class="loading"><Loading /></el-icon>
                             <span class="progress" v-if="item.hook_updater.Length ==0">0%</span>
                             <span class="progress" v-else>{{parseInt(item.hook_updater.Current/item.hook_updater.Length*100)}}%</span>
                         </template>
                         <template v-else-if="item.hook_updater.Status == 6">
-                            <el-icon size="14" class="yellow"><CircleCheck /></el-icon>
+                            <el-icon size="12" class="yellow"><CircleCheck /></el-icon>
                         </template>
                     </template>
                     <template v-else>
-                        <el-icon size="14"><Download /></el-icon>
+                        <el-icon size="12"><Download /></el-icon>
                     </template>
                 </span>
             </a>
@@ -50,21 +50,21 @@ export default {
         const updaterVersion = computed(()=>updater.value.current.Version);
         const updaterText = computed(()=>{
             if(!props.item.hook_updater){
-                return '未检测到更新';
+                return t('updater.no');
             }
             
             if(props.item.hook_updater.Status <= 2) {
                 return props.item.Version != serverVersion.value 
-                ? `与服务器版本(${serverVersion.value})不一致，建议更新` 
+                ? `${t('updater.same')}(${serverVersion.value})` 
                 : updaterVersion.value != props.item.Version 
-                    ? `不是最新版本(${updaterVersion.value})，建议更新` 
-                    : `是最新版本，但我无法阻止你喜欢更新`
+                    ? `${t('updater.notnew')}(${updaterVersion.value})` 
+                    : t('updater.new')
             }
             return {
-                3:'正在下载',
-                4:'已下载',
-                5:'正在解压',
-                6:'已解压，请重启',
+                3:t('updater.downloading'),
+                4:t('updater.downloaded'),
+                5:t('updater.unziping'),
+                6:t('updater.unzip'),
             }[props.item.hook_updater.Status];
         })
         const updaterColor = computed(()=>{
@@ -80,28 +80,26 @@ export default {
                 return;
             }
             if(!access.UpdateSelf){
-                ElMessage.error('无权限');
+                ElMessage.error(t('connom.access'));
                 return;
             }
             if(props.item.MachineId != globalData.value.self.MachineId && !access.UpdateOther){
-                ElMessage.error('无权限');
+                ElMessage.error(t('connom.access'));
                 return;
             }
 
             if(!props.item.hook_updater){
-                ElMessage.error('未检测到更新');
+                ElMessage.error(t('updater.no'));
                 return;
             }
-            //未检测，检测中，下载中，解压中
             if([0,1,3,5].indexOf(props.item.hook_updater.Status)>=0){
-                ElMessage.error('操作中，请稍后!');
+                ElMessage.error(t('common.operating'));
                 return;
             }
-            //已解压
             if(props.item.hook_updater.Status == 6){
-                ElMessageBox.confirm('确定关闭程序吗？', '提示', {
-                    confirmButtonText: '确定',
-                    cancelButtonText: '取消',
+                ElMessageBox.confirm(t('updater.close'), t('common.tips'), {
+                    confirmButtonText: t('common.confirm'),
+                    cancelButtonText:t('common.cancel'),
                     type: 'warning'
                 }).then(() => {
                     exit(props.item.MachineId);
@@ -127,7 +125,6 @@ export default {
 a{
     color:#666;
     text-decoration: underline;
-    &.green{color:green;font-weight:bold;}
 }
 a.download{
     margin-left:.6rem

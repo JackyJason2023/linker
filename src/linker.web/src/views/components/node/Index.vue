@@ -1,9 +1,9 @@
 <template>
-    <el-dialog v-model="state.show" :title="$t('server.denyTitle',[data.Name])" top="1vh" width="400">
+    <el-dialog append-to=".app-wrap" v-model="state.show" :title="$t('deny.title',[data.Name])" top="1vh" width="400">
         <div>
             <el-tabs type="border-card">
-                <el-tab-pane :label="$t('server.denyMasters')"><Masters :type="type" :data="data"></Masters></el-tab-pane>
-                <el-tab-pane :label="$t('server.denyList')"><Denys :type="type" :data="data"></Denys></el-tab-pane>
+                <el-tab-pane :label="$t('deny.online')"><Masters :type="type" :data="data"></Masters></el-tab-pane>
+                <el-tab-pane :label="$t('deny.list')"><Denys :type="type" :data="data"></Denys></el-tab-pane>
             </el-tabs>
         </div>
     </el-dialog>

@@ -1,5 +1,5 @@
 <template>
-    <el-dialog class="options-center" title="更新" destroy-on-close v-model="state.show" width="40rem" top="2vh">
+    <el-dialog append-to=".app-wrap" class="options-center" :title="$t('updater')" destroy-on-close v-model="state.show" width="42rem" top="2vh">
         <div class="updater-wrap t-c">
             <AccessBoolean value="UpdateSelf,UpdateOther">
                 <template #default="{values}">
@@ -26,7 +26,7 @@
                         </el-row>
                     </div>
                     <div class="mgt-1 t-c">
-                        <el-button type="success" @click="handleUpdate(values)" plain>确 定</el-button>
+                        <el-button type="success" @click="handleUpdate(values)" plain>{{$t('common.confirm')}}</el-button>
                     </div>
                 </template>
             </AccessBoolean>
@@ -39,19 +39,21 @@ import { injectGlobalData } from '@/provide';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { confirm, getUpdaterMsg } from '@/apis/updater';
 import { useUpdater } from './updater';
+import { useI18n } from 'vue-i18n';
 
 export default {
     props: ['modelValue'],
     emits: ['update:modelValue'],
     setup (props,{emit}) {
 
+        const {t} = useI18n();
         const globalData = injectGlobalData();
         const updater = useUpdater();
         const serverVersion = computed(()=>globalData.value.signin.Version);
         const updaterVersion = computed(()=>updater.value.current.Version);
         const versions = [
-                {label:`${updaterVersion.value}【最新版本】`,value:updaterVersion.value},
-                {label:`${serverVersion.value}【服务器版本】`,value:serverVersion.value},
+                {label:`${updaterVersion.value}【${t('updater.latest')}】`,value:updaterVersion.value},
+                {label:`${serverVersion.value}【${t('updater.server')}】`,value:serverVersion.value},
             ].filter(c=>c.value);
         const state = reactive({
             show: true,
@@ -71,9 +73,9 @@ export default {
 
         const getTypes = (accesss)=>{
             const types =  [
-                {label:`仅【${updater.value.device.MachineName}】`,value:updater.value.device.MachineId},
-                accesss.UpdateOther ? {label:`本组所有`,value:'g-all'} : {},
-                accesss.UpdateOther ?  {label:`本服务器所有`,value:'s-all'} : {},
+                {label:`${t('updater.only')}【${updater.value.device.MachineName}】`,value:updater.value.device.MachineId},
+                accesss.UpdateOther ? {label:t('updater.this.group'),value:'g-all'} : {},
+                accesss.UpdateOther ?  {label:t('updater.this.server'),value:'s-all'} : {},
             ].filter(c=>c.value);
             if(!state.type){
                 state.type = types[0] || '';

@@ -2,7 +2,7 @@
 using linker.libs.extends;
 using linker.libs.timer;
 using linker.messenger.signin;
-using linker.messenger.tunnel;
+using linker.messenger.tunnel.client;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Net;
@@ -25,8 +25,10 @@ namespace linker.messenger.flow
         /// </summary>
         public long SendtBytes { get; private set; }
 
+        private readonly ConcurrentQueue<(IPEndPoint ep, int online, int total, List<FlowReportNetInfo> nets)> onlineQueue = new();
 
-        private readonly ConcurrentDictionary<IPAddress, OnlineFlowInfo> servers = new(new IPAddressComparer());
+
+        private readonly ConcurrentDictionary<IPAddress, OnlineFlowInfo> servers = new();
         private readonly SignInServerCaching signCaching;
         private readonly ISerializer serializer;
         public FlowResolver(SignInServerCaching signCaching, ISerializer serializer)
@@ -40,42 +42,22 @@ namespace linker.messenger.flow
             return (ReceiveBytes, SendtBytes);
         }
 
-        public async Task Resolve(Socket socket, Memory<byte> memory)
+        public  Task Resolve(Socket socket, Memory<byte> memory)
         {
-            await Task.CompletedTask.ConfigureAwait(false);
+            return Task.CompletedTask;
         }
         public async Task Resolve(Socket socket, IPEndPoint ep, Memory<byte> memory)
         {
             try
             {
-                long time = Environment.TickCount64;
-
-                if (servers.TryGetValue(ep.Address, out OnlineFlowInfo onlineFlowInfo) == false)
-                {
-                    onlineFlowInfo = new OnlineFlowInfo { Time = time };
-                    servers.TryAdd(ep.Address, onlineFlowInfo);
-                }
-                onlineFlowInfo.Time = time;
-                onlineFlowInfo.Online = memory.Slice(0, 4).ToInt32();
-                onlineFlowInfo.Total = memory.Slice(4, 4).ToInt32();
-
-                long online = (long)servers.Where(c => time - c.Value.Time < 15000).Sum(c => c.Value.Online) << 32;
-                long total = servers.Where(c => time - c.Value.Time < 15000).Sum(c => c.Value.Total);
-                ReceiveBytes = online | total;
-                SendtBytes = servers.Count(c => time - c.Value.Time < 15000);
-
+                int online = memory.Slice(0, 4).ToInt32();
+                int total = memory.Slice(4, 4).ToInt32();
+                List<FlowReportNetInfo> nets = new List<FlowReportNetInfo>();
                 if (memory.Length > 8)
                 {
-                    var nets = serializer.Deserialize<List<FlowReportNetInfo>>(memory.Slice(8).Span);
-                    onlineFlowInfo.Nets = nets.Where(c => c.Lon > 0 && c.Lat > 0 && (string.IsNullOrWhiteSpace(c.City) || c.City.IndexOf('-') < 0)).ToList();
-                    onlineFlowInfo.Systems = nets.Where(c => c.Lon == 0 && c.Lat == 0 && string.IsNullOrWhiteSpace(c.City) == false && c.City.IndexOf('-') > 0).ToList();
+                    nets = serializer.Deserialize<List<FlowReportNetInfo>>(memory.Slice(8).Span);
                 }
-                Version.Increment();
-
-                if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
-                {
-                    LoggerHelper.Instance.Debug($"online:{online},total:{total},server:{SendtBytes}");
-                }
+                onlineQueue.Enqueue((ep, online, total, nets));
             }
             catch (Exception ex)
             {
@@ -116,21 +98,81 @@ namespace linker.messenger.flow
 
         private void OnlineTask()
         {
-            UdpClient udpClient = new UdpClient(AddressFamily.InterNetwork);
+            UdpClient udpClient = new UdpClient();
             udpClient.Client.WindowsUdpBug();
+            string domain = "linker.snltty.com";
+#if DEBUG
+            domain = "127.0.0.1";
+#endif
+
+            bool connected = false;
             TimerHelper.SetIntervalLong(() =>
             {
-                try
+                if(connected == false)
                 {
-                    Report(udpClient);
-                }
-                catch (Exception ex)
-                {
-                    if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                    try
                     {
-                        LoggerHelper.Instance.Error(ex);
+                        udpClient.Connect(domain, 1802);
+                        connected = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                        {
+                            LoggerHelper.Instance.Error(ex);
+                        }
                     }
                 }
+                else
+                {
+                    try
+                    {
+                        Report(udpClient);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                        {
+                            LoggerHelper.Instance.Error(ex);
+                        }
+                    }
+                }
+
+                long time = Environment.TickCount64;
+                while (onlineQueue.TryDequeue(out (IPEndPoint ep, int online, int total, List<FlowReportNetInfo> nets) value))
+                {
+                    try
+                    {
+                        if (servers.TryGetValue(value.ep.Address, out OnlineFlowInfo onlineFlowInfo) == false)
+                        {
+                            onlineFlowInfo = new OnlineFlowInfo { Time = time };
+                            servers.TryAdd(value.ep.Address, onlineFlowInfo);
+                        }
+                        onlineFlowInfo.Time = time;
+                        onlineFlowInfo.Online = value.online;
+                        onlineFlowInfo.Total = value.total;
+
+                        if (value.nets != null && value.nets.Count > 0)
+                        {
+                            onlineFlowInfo.Nets = value.nets.Where(c => c.Lon > 0 && c.Lat > 0 && (string.IsNullOrWhiteSpace(c.City) || c.City.IndexOf('-') < 0)).ToList();
+                            onlineFlowInfo.Systems = value.nets.Where(c => c.Lon == 0 && c.Lat == 0 && string.IsNullOrWhiteSpace(c.City) == false && c.City.IndexOf('-') > 0).ToList();
+                        }
+                        if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+                        {
+                            //LoggerHelper.Instance.Debug($"online:{value.online},total:{value.total},server:{SendtBytes}");
+                        }
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+
+                long online = (long)servers.Where(c => time - c.Value.Time < 15000).Sum(c => c.Value.Online) << 32;
+                long total = servers.Where(c => time - c.Value.Time < 15000).Sum(c => c.Value.Total);
+                ReceiveBytes = online | total;
+                SendtBytes = servers.Count(c => time - c.Value.Time < 15000);
+                Version.Increment();
+
             }, 5000);
         }
 
@@ -163,16 +205,11 @@ namespace linker.messenger.flow
 
             if (buffer.SequenceEqual(oldBuffer))
             {
+                udpClient.Send(buffer.Slice(0, 9));
                 return;
             }
             oldBuffer = buffer.ToArray();
-
-
-            string domain = "linker.snltty.com";
-#if DEBUG
-            domain = "127.0.0.1";
-#endif
-            udpClient.Send(buffer.Slice(0, 9 + netBytes.Length), domain, 1802);
+            udpClient.Send(buffer.Slice(0, 9 + netBytes.Length));
         }
     }
 
@@ -184,17 +221,5 @@ namespace linker.messenger.flow
 
         public List<FlowReportNetInfo> Nets { get; set; } = new List<FlowReportNetInfo>();
         public List<FlowReportNetInfo> Systems { get; set; } = new List<FlowReportNetInfo>();
-    }
-    public sealed class IPAddressComparer : IEqualityComparer<IPAddress>
-    {
-        public bool Equals(IPAddress x, IPAddress y)
-        {
-            return x.Equals(y);
-        }
-        public int GetHashCode(IPAddress obj)
-        {
-            if (obj == null) return 0;
-            return obj.GetHashCode();
-        }
     }
 }

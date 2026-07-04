@@ -1,0 +1,14 @@
+{
+    "permission.closed": "禁止通行",
+    "permission.simple": "简单管理",
+    "permission.full": "专业管理",
+    "permission.clear": "清除连接",
+
+    "api.title":"管理接口",
+    "api.api":"接口",
+    "api.pwd":"密码",
+    "api.remember":"记住{0}",
+    "api": "管理接口",
+    "api.clear": "清除",
+    "api.alter": "更改"
+}

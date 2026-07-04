@@ -49,9 +49,14 @@ namespace linker.tunnel.transport
         public byte Order { get; }
 
         /// <summary>
+        /// 允许地址类型
+        /// </summary>
+        public bool EnableAddr { get; }
+
+        /// <summary>
         /// 收到连接
         /// </summary>
-        public Action<ITunnelConnection> OnConnected { get; set; }
+        public Action<ITunnelConnection, TunnelTransportInfo> OnConnected { get; set; }
 
         public void SetSSL(X509Certificate certificate);
 
@@ -119,6 +124,11 @@ namespace linker.tunnel.transport
         /// 固定端口，内网
         /// </summary>
         public int PortMapLan { get; set; }
+
+        /// <summary>
+        /// 预测的端口列表
+        /// </summary>
+        public int[] PredictPorts { get; set; } = [];
     }
 
     public sealed partial class TunnelTransportItemInfo
@@ -168,6 +178,10 @@ namespace linker.tunnel.transport
         public Addrs Addr { get; set; } = Addrs.Ipv6 | Addrs.Ipv4 | Addrs.Lan;
 
         public TunnelType TunnelType { get; set; }
+        public bool EnableAddr { get; set; }
+
+
+
     }
 
     public enum Addrs : byte
@@ -220,23 +234,14 @@ namespace linker.tunnel.transport
         public uint FlowId { get; set; }
 
         /// <summary>
-        /// 标签
+        /// 配置
         /// </summary>
-        public string TransactionTag { get; set; }
+        public Dictionary<string, string> Configure { get; set; } = [];
 
         /// <summary>
         /// 目标ip列表
         /// </summary>
         public List<IPEndPoint> RemoteEndPoints { get; set; }
-
-        public string Flag { get; set; }
-    }
-
-
-    public sealed class TunnelExIPInfo
-    {
-        public IPAddress IP { get; set; }
-        public byte PrefixLength { get; set; }
     }
 
 

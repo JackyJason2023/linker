@@ -1,0 +1,11 @@
+{
+    "head.home": "首页",
+    "head.server": "服务器",
+    "head.protocol": "隧道",
+    "head.action": "验证",
+    "head.firewall": "防火墙",
+    "head.wakeup": "唤醒",
+    "head.logger": "日志",
+    "head.refresh": "刷新",
+    "head.about": "关于"
+}

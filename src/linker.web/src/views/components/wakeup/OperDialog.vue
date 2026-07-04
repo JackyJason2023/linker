@@ -1,6 +1,6 @@
 <template>
-    <el-dialog v-model="state.show" append-to=".app-wrap" :title="`[${state.machineName}]上的唤醒`"
-     top="1vh" width="98%" style="height:80vh" class="wakeup-dialog">
+    <el-dialog append-to=".app-wrap" v-model="state.show" :title="$t('wakeup.title',[state.machineName])"
+     top="1vh" width="80rem" style="height:80vh" class="wakeup-dialog">
         <div class="h-100">
             <Wakeup :machineId="state.machineId"></Wakeup>
         </div>

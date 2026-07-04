@@ -36,14 +36,16 @@ namespace linker.tunnel.transport
 
         public byte Order => 4;
 
+        public bool EnableAddr => true;
+
         /// <summary>
         /// 连接成功
         /// </summary>
-        public Action<ITunnelConnection> OnConnected { get; set; } = (state) => { };
+        public Action<ITunnelConnection, TunnelTransportInfo> OnConnected { get; set; } = (state, info) => { };
 
 
-        private readonly byte[] authBytes = Encoding.UTF8.GetBytes($"{Helper.GlobalString}.tcp.ttl1");
-        private readonly byte[] endBytes = Encoding.UTF8.GetBytes($"{Helper.GlobalString}.tcp.end1");
+        private readonly byte[] authBytes = Encoding.UTF8.GetBytes($"GET /snltty/tcp/index.html HTTP/1.1\r\nHost: www.snltty.com\r\nConnection: keep-alive\r\nTransfer-Encoding: chunked\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nCookie: {Helper.GlobalString}.tcp.ttl1\r\n\r\n");
+        private readonly byte[] endBytes = Encoding.UTF8.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: keep-alive\r\nContent-Type: text/html\r\nCookie: {Helper.GlobalString}.tcp.end1\r\n\r\nOK");
 
         private readonly ITunnelMessengerAdapter tunnelMessengerAdapter;
         public TransportTcpP2PNAT(ITunnelMessengerAdapter tunnelMessengerAdapter)
@@ -97,7 +99,7 @@ namespace linker.tunnel.transport
             ITunnelConnection connection = await ConnectForward(tunnelTransportInfo, TunnelMode.Server).ConfigureAwait(false);
             if (connection != null)
             {
-                OnConnected(connection);
+                OnConnected(connection, tunnelTransportInfo);
                 await tunnelMessengerAdapter.SendConnectSuccess(tunnelTransportInfo).ConfigureAwait(false);
             }
             else
@@ -118,7 +120,7 @@ namespace linker.tunnel.transport
         {
             if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
             {
-                LoggerHelper.Instance.Warning($"{Name} connect to {tunnelTransportInfo.Remote.MachineId}->{tunnelTransportInfo.Remote.MachineName} {string.Join("\r\n", tunnelTransportInfo.RemoteEndPoints.Select(c => c.ToString()))}");
+                LoggerHelper.Instance.Warning($"{Name} connect to {tunnelTransportInfo.Remote.MachineId}->{tunnelTransportInfo.Remote.MachineName} {tunnelTransportInfo.RemoteEndPoints.FirstOrDefault()}");
             }
 
             for (int i = 0; i < 5; i++)
@@ -145,11 +147,7 @@ namespace linker.tunnel.transport
                     targetSocket.IPv6Only(ep.AddressFamily, false);
                     targetSocket.ReuseBind(new IPEndPoint(ep.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any, tunnelTransportInfo.Local.Local.Port));
 
-                    if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
-                    {
-                        LoggerHelper.Instance.Warning($"{Name} connect to {tunnelTransportInfo.Remote.MachineId}->{tunnelTransportInfo.Remote.MachineName} {ep}");
-                    }
-                    await targetSocket.ConnectAsync(ep,cts.Token).ConfigureAwait(false);
+                    await targetSocket.ConnectAsync(ep, cts.Token).ConfigureAwait(false);
 
                     return (true, targetSocket);
                 }
@@ -162,6 +160,11 @@ namespace linker.tunnel.transport
         }
         private bool ValidateServerCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
+            if (LoggerHelper.Instance.LoggerLevel <= LoggerTypes.DEBUG)
+            {
+                LoggerHelper.Instance.Info($"【P2P {Name}】Certificate validation: {certificate?.Subject}");
+                LoggerHelper.Instance.Info($"【P2P {Name}】SSL Policy Errors: {sslPolicyErrors}");
+            }
             return true;
         }
 
@@ -169,12 +172,13 @@ namespace linker.tunnel.transport
         {
             using IMemoryOwner<byte> buffer = MemoryPool<byte>.Shared.Rent(4 * 1024);
             using CancellationTokenSource cts = new CancellationTokenSource(500);
+            using CancellationTokenSource ctsSsl = new CancellationTokenSource(3000);
             try
             {
                 //随便发个消息看对方有没有收到
                 await socket.SendAsync(authBytes).ConfigureAwait(false);
                 //如果对方收到，会回个消息，不管是啥，回了就行
-                int length = await socket.ReceiveAsync(buffer.Memory,cts.Token).ConfigureAwait(false);
+                int length = await socket.ReceiveAsync(buffer.Memory, cts.Token).ConfigureAwait(false);
                 if (length == 0) return null;
 
                 //需要ssl
@@ -182,23 +186,21 @@ namespace linker.tunnel.transport
                 if (state.SSL)
                 {
                     sslStream = new SslStream(new NetworkStream(socket, false), false, ValidateServerCertificate, null);
-#pragma warning disable SYSLIB0039 // 类型或成员已过时
                     await sslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
                     {
-                        EnabledSslProtocols = SslProtocols.Tls13 | SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls,
+                        EnabledSslProtocols = SslProtocols.Tls13 | SslProtocols.Tls12,
                         CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
-                        ClientCertificates = new X509CertificateCollection { certificate }
-                    }).ConfigureAwait(false);
-#pragma warning restore SYSLIB0039 // 类型或成员已过时
+                        ClientCertificates = new X509CertificateCollection { certificate },
+                    }, ctsSsl.Token).ConfigureAwait(false);
                 }
 
                 return new TunnelConnectionTcp
                 {
                     Stream = sslStream,
                     Socket = socket,
-                    IPEndPoint = NetworkHelper.TransEndpointFamily(socket.RemoteEndPoint as IPEndPoint),
+                    IPEndPoint = (socket.RemoteEndPoint as IPEndPoint).MapToIPv4(),
                     TransactionId = state.TransactionId,
-                    TransactionTag = state.TransactionTag,
+                    Configure = state.Configure,
                     RemoteMachineId = state.Remote.MachineId,
                     RemoteMachineName = state.Remote.MachineName,
                     TransportName = Name,
@@ -224,10 +226,12 @@ namespace linker.tunnel.transport
         {
             using IMemoryOwner<byte> buffer = MemoryPool<byte>.Shared.Rent(4 * 1024);
             using CancellationTokenSource cts = new CancellationTokenSource(500);
+            SslStream sslStream = null;
+            socket.KeepAlive();
             try
             {
                 //对方会随便发个消息，不管是啥
-                int length = await socket.ReceiveAsync(buffer.Memory,cts.Token).ConfigureAwait(false);
+                int length = await socket.ReceiveAsync(buffer.Memory, cts.Token).ConfigureAwait(false);
                 if (length == 0)
                 {
                     return null;
@@ -235,8 +239,6 @@ namespace linker.tunnel.transport
                 //回个消息给它就完了
                 await socket.SendAsync(endBytes).ConfigureAwait(false);
 
-                socket.KeepAlive();
-                SslStream sslStream = null;
                 if (state.SSL)
                 {
                     if (certificate == null)
@@ -247,9 +249,14 @@ namespace linker.tunnel.transport
                     }
 
                     sslStream = new SslStream(new NetworkStream(socket, false), false, ValidateServerCertificate, null);
-#pragma warning disable SYSLIB0039 // 类型或成员已过时
-                    await sslStream.AuthenticateAsServerAsync(certificate, OperatingSystem.IsAndroid(), SslProtocols.Tls13 | SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls, false).ConfigureAwait(false);
-#pragma warning restore SYSLIB0039 // 类型或成员已过时
+                    using CancellationTokenSource _cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(5000));
+                    await sslStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
+                    {
+                        ServerCertificate = certificate,
+                        EnabledSslProtocols = SslProtocols.Tls13 | SslProtocols.Tls12,
+                        CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
+                        ClientCertificateRequired = OperatingSystem.IsAndroid(),
+                    }, _cts.Token).ConfigureAwait(false);
                 }
 
                 return new TunnelConnectionTcp
@@ -263,9 +270,9 @@ namespace linker.tunnel.transport
                     Type = TunnelType,
                     Mode = TunnelMode.Server,
                     TransactionId = state.TransactionId,
-                    TransactionTag = state.TransactionTag,
+                    Configure = state.Configure,
                     TransportName = state.TransportName,
-                    IPEndPoint = NetworkHelper.TransEndpointFamily(socket.RemoteEndPoint as IPEndPoint),
+                    IPEndPoint = (socket.RemoteEndPoint as IPEndPoint).MapToIPv4(),
                     Label = string.Empty,
                     SSL = state.SSL,
                     BufferSize = state.BufferSize,
@@ -277,6 +284,8 @@ namespace linker.tunnel.transport
                 {
                     LoggerHelper.Instance.Error(ex);
                 }
+                socket?.SafeClose();
+                sslStream?.Dispose();
             }
             return null;
         }

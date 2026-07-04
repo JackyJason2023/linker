@@ -2,7 +2,6 @@
 using linker.libs.extends;
 using linker.libs.timer;
 using linker.messenger.decenter;
-using linker.messenger.forward.proxy;
 using linker.messenger.signin;
 using System.Net.Sockets;
 
@@ -38,7 +37,7 @@ namespace linker.messenger.forward
             signInClientState.OnSignInSuccess += Reset;
         }
 
-        private void Reset(int times)
+        private Task Reset(int times)
         {
             TimerHelper.Async(async () =>
             {
@@ -50,6 +49,7 @@ namespace linker.messenger.forward
                 await Task.Delay(5000).ConfigureAwait(false);
                 Start(false);
             });
+            return Task.CompletedTask;
         }
 
         private void Start(bool errorStop = true)

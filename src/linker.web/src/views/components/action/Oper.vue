@@ -1,6 +1,6 @@
 <template>
     <AccessShow value="ActionOther">
-        <el-dropdown-item v-if="item.isSelf==false" @click="handleAction"><el-icon><Lock /></el-icon>{{$t('home.action')}}</el-dropdown-item>
+        <el-dropdown-item v-if="item.isSelf==false" @click="handleAction"><el-icon><Lock /></el-icon>{{$t('oper.action')}}</el-dropdown-item>
     </AccessShow>
 </template>
 

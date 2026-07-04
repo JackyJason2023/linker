@@ -1,5 +1,5 @@
 <template>
-    <el-table-column prop="socks5" :label="$t('home.proxy')" width="160">
+    <el-table-column prop="socks5" label="socks5+http" width="140">
         <template #default="scope">
             <template v-if="scope.row &&scope.row.hook_socks5">
                 <div class="skeleton-animation" :style="`animation-delay:${scope.row.animationDelay}ms`">
@@ -10,8 +10,8 @@
                 <div class="skeleton-animation">
                     <el-skeleton animated >
                         <template #template>
-                            <el-skeleton-item variant="text" style="width: 60%;" />
-                            <el-skeleton-item variant="text" style="width: 20%;margin-left:20%" />
+                            <el-skeleton-item variant="text" class="w-60-" />
+                            <el-skeleton-item variant="text" class="w-20- mgl-20-"/>
                         </template>
                     </el-skeleton>
                 </div>

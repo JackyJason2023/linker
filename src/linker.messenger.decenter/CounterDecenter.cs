@@ -13,6 +13,7 @@ namespace linker.messenger.decenter
         public VersionManager PushVersion { get; } = new VersionManager();
         public VersionManager DataVersion { get; } = new VersionManager();
         public bool Force => CountDic.Count < 2;
+        public int Count => CountDic.Count;
         public ConcurrentDictionary<string, ConcurrentDictionary<string, int>> CountDic { get; } = new ConcurrentDictionary<string, ConcurrentDictionary<string, int>>();
         private readonly ConcurrentDictionary<string, int> values = new ConcurrentDictionary<string, int>();
 

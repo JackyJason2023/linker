@@ -1,11 +1,12 @@
 <template>
-   <el-table border style="width: 100%" height="32px" size="small" @sort-change="handleSortChange" class="table-sort">
-        <el-table-column prop="MachineId" :label="$t('home.device')" width="90" sortable="custom" ></el-table-column>
-        <el-table-column prop="Version" :label="$t('home.version')" width="90" sortable="custom"></el-table-column>
-        <el-table-column prop="tunnel" :label="$t('home.tunnel')" width="86" sortable="custom"></el-table-column>
-        <el-table-column prop="tuntap" :label="$t('home.tuntapIP')" width="160" sortable="custom"></el-table-column>
-        <el-table-column prop="socks5" :label="$t('home.proxy')" width="160" sortable="custom"></el-table-column>
-        <el-table-column label="..." fixed="right"  min-width="110">
+   <el-table border height="32px" size="small" @sort-change="handleSortChange" class="table-sort w-100" :default-sort="sort">
+        <el-table-column prop="machineName" :label="$t('device')" width="108" sortable="custom" ></el-table-column>
+        <el-table-column prop="version" :label="$t('common.version')" width="98" sortable="custom"></el-table-column>
+        <el-table-column prop="tunnel" :label="$t('network')" width="104" sortable="custom"></el-table-column>
+        <el-table-column prop="tuntap" :label="$t('tuntap')" width="170" sortable="custom"></el-table-column>
+        <el-table-column prop="socks5" :label="$t('socks5')" width="140" sortable="custom"></el-table-column>
+        <el-table-column prop="forward" :label="$t('forward')" width="96" sortable="custom"></el-table-column>
+        <el-table-column prop="oper" fixed="right" sortable="custom" min-width="110">
             <template #header>
             </template>
         </el-table-column>
@@ -13,6 +14,7 @@
 </template>
 
 <script>
+import { ref } from 'vue';
 import { useForward } from '../../../components/forward/forward';
 import { useSocks5 } from '../../../components/socks5/socks5';
 import { useTuntap } from '../../../components/tuntap/tuntap';
@@ -23,6 +25,10 @@ export default {
     components: { ArrowDownBold },
     setup (props, { emit }) {
 
+        const sort = ref({
+            prop: localStorage.getItem('prop') || '', 
+            order: localStorage.getItem('asc')  == 'true' ? 'ascending' : 'descending'
+        });
         const tuntap = useTuntap();
         tuntap.value.show = localStorage.getItem('tuntap.show')!='false';
         const socks5 = useSocks5();
@@ -44,7 +50,7 @@ export default {
         }
         
 
-        return {tuntap,socks5,forward,handleSortChange,handleTuntapShow,handleSocks5Show,handleForwardShow}
+        return {sort,tuntap,socks5,forward,handleSortChange,handleTuntapShow,handleSocks5Show,handleForwardShow}
     }
 }
 </script>
@@ -52,7 +58,7 @@ export default {
 <style lang="stylus" scoped>
 .table-sort 
 {
-    th{border-bottom:0}
+    margin-bottom:-1px;
 }
 .show-columns{
     vertical-align:middle;

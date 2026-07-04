@@ -33,6 +33,13 @@ namespace linker.libs.extends
                 *(long*)p = value;
             }
         }
+        public static unsafe void ToBytes(this long value, Span<byte> memory)
+        {
+            fixed (void* p = memory)
+            {
+                *(long*)p = value;
+            }
+        }
         public static unsafe void ToBytes(this long[] value, Memory<byte> memory)
         {
             fixed (void* p = &value[0])
@@ -145,7 +152,18 @@ namespace linker.libs.extends
                 *(ushort*)p = value;
             }
         }
+        public static unsafe void ToBytes(this ushort value, ReadOnlySpan<byte> span)
+        {
+            fixed (void* p = span)
+            {
+                *(ushort*)p = value;
+            }
+        }
         public static unsafe void ToBytes(this ushort value, Memory<byte> memory)
+        {
+            value.ToBytes(memory.Span);
+        }
+        public static unsafe void ToBytes(this ushort value, ReadOnlyMemory<byte> memory)
         {
             value.ToBytes(memory.Span);
         }
@@ -214,7 +232,7 @@ namespace linker.libs.extends
         #region 32
         public static int ToInt32(this byte[] bytes, int startindex = 0)
         {
-            return Unsafe.As<byte, ushort>(ref bytes[startindex]);
+            return Unsafe.As<byte, int>(ref bytes[startindex]);
         }
         public static int ToInt32(this ReadOnlySpan<byte> span)
         {
@@ -310,6 +328,8 @@ namespace linker.libs.extends
         #endregion
 
         #endregion
+
+
 
 
     }

@@ -1,0 +1,8 @@
+{
+    "group": "Group manager",
+    "group.share": "Group share",
+    "group.join": "Group join",
+    "group.name": "Name",
+    "group.psswd": "Password",
+    "group.validate": "Name or Id empty item has exists"
+}

@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace linker.libs.extends
 {
@@ -44,7 +47,6 @@ namespace linker.libs.extends
                 try
                 {
                     socket.Shutdown(SocketShutdown.Both);
-                    //调试注释
                     socket.Disconnect(false);
                 }
                 catch (Exception)
@@ -70,9 +72,9 @@ namespace linker.libs.extends
         }
         public static void ReuseBind(this Socket socket, IPEndPoint ip)
         {
-            if(ip.AddressFamily == AddressFamily.InterNetworkV6)
+            if (ip.AddressFamily == AddressFamily.InterNetworkV6)
             {
-                socket.IPv6Only(ip.AddressFamily,false);
+                socket.IPv6Only(ip.AddressFamily, false);
             }
             socket.Reuse(true);
             socket.Bind(ip);
@@ -84,6 +86,20 @@ namespace linker.libs.extends
             socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, interval);
             //socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, retryCount);
             socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, time);
+        }
+
+        public static async ValueTask<int> SendAllAsync(this Socket socket, ReadOnlyMemory<byte> data, CancellationToken token = default)
+        {
+            int sendt = 0;
+            do
+            {
+                ReadOnlyMemory<byte> sendBlock = data.Slice(sendt);
+                int remaining = await socket.SendAsync(sendBlock, SocketFlags.None, token).ConfigureAwait(false);
+                if (remaining == 0) break;
+
+                sendt += remaining;
+            } while (sendt < data.Length);
+            return sendt;
         }
     }
 }

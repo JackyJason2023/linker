@@ -9,11 +9,13 @@
 import { getPlans, removePlan } from '@/apis/plan';
 import { onMounted, onUnmounted,  provide,  ref } from 'vue';
 import PlanEdit from './PlanEdit.vue';
+import { useI18n } from 'vue-i18n';
 export default {
     components: { PlanEdit },
     props:['machineid','category','handles'],
     setup (props) {
         
+        const {t} = useI18n();
         const plan = ref({
             machineid:props.machineid,
             timer:0,
@@ -25,12 +27,12 @@ export default {
             handleJson:(props.handles||[]).reduce((json,item,index)=>{ json[item.value] = item.label; return json;  },{}),
             triggers:[],
             methods:[
-                {label:'手动',value:0},
-                {label:'启动后',value:1},
-                {label:'到点',value:2},
-                {label:'定时',value:4},
+                {label:t('plan.manual'),value:0},
+                {label:t('plan.setup'),value:1},
+                {label:t('plan.attime'),value:2},
+                {label:t('plan.timer'),value:4},
                 {label:'Cron',value:8},
-                {label:'触发',value:16},
+                {label:t('plan.trigger'),value:16},
             ]
         });
         provide('plan',plan);

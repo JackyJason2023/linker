@@ -40,9 +40,12 @@ namespace linker.messenger.serializer.memorypack
             MemoryPackFormatterProvider.Register(new TunnelRouteLevelInfoFormatter());
             MemoryPackFormatterProvider.Register(new TunnelNetworkInfoFormatter());
             MemoryPackFormatterProvider.Register(new TunnelSetRouteLevelInfoFormatter());
+            MemoryPackFormatterProvider.Register(new TunnelRelayInfoFormatter());
+            
             MemoryPackFormatterProvider.Register(new TunnelInterfaceInfoFormatter());
             MemoryPackFormatterProvider.Register(new TunnelNetInfoFormatter());
             MemoryPackFormatterProvider.Register(new TunnelTransportItemSetInfoFormatter());
+            MemoryPackFormatterProvider.Register(new PortMappingInfoFormatter());
 
 
             MemoryPackFormatterProvider.Register(new DecenterSyncInfoFormatter());
@@ -92,15 +95,15 @@ namespace linker.messenger.serializer.memorypack
             MemoryPackFormatterProvider.Register(new Socks5InfoFormatter());
 
 
-            MemoryPackFormatterProvider.Register(new SForwardInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardAddInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardAddResultInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardAddForwardInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardRemoveForwardInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardProxyInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardServerNodeReportInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardServerNodeStoreInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardServerNodeReportInfoOldFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseInfoFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseAddInfoFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseAddResultInfoFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseAddForwardInfoFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseRemoveForwardInfoFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseProxyInfoFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseServerNodeReportInfoFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseServerNodeStoreInfoFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseServerNodeReportInfoOldFormatter());
 
 
             MemoryPackFormatterProvider.Register(new ForwardInfoFormatter());
@@ -117,9 +120,9 @@ namespace linker.messenger.serializer.memorypack
             MemoryPackFormatterProvider.Register(new RelayFlowItemInfoFormatter());
             MemoryPackFormatterProvider.Register(new RelayFlowRequestInfoFormatter());
             MemoryPackFormatterProvider.Register(new RelayFlowResponseInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardFlowItemInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardFlowRequestInfoFormatter());
-            MemoryPackFormatterProvider.Register(new SForwardFlowResponseInfoFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseFlowItemInfoFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseFlowRequestInfoFormatter());
+            MemoryPackFormatterProvider.Register(new ReverseFlowResponseInfoFormatter());
             MemoryPackFormatterProvider.Register(new ForwardFlowItemInfoFormatter());
             MemoryPackFormatterProvider.Register(new ForwardFlowRequestInfoFormatter());
             MemoryPackFormatterProvider.Register(new ForwardFlowResponseInfoFormatter());
@@ -138,6 +141,8 @@ namespace linker.messenger.serializer.memorypack
             MemoryPackFormatterProvider.Register(new TuntapForwardTestInfoFormatter());
             MemoryPackFormatterProvider.Register(new TuntapLanInfoFormatter());
             MemoryPackFormatterProvider.Register(new LeaseInfoFormatter());
+            MemoryPackFormatterProvider.Register(new LeaseSubInfoFormatter());
+            MemoryPackFormatterProvider.Register(new TuntapFecProfileInfoFormatter());
 
 
             MemoryPackFormatterProvider.Register(new PlanInfoFormatter());

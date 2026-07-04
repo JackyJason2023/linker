@@ -1,10 +1,7 @@
 <template>
-    <el-form-item :label="$t('server.updater')">
-        <div class="flex">
-            <el-checkbox v-model="state.sync2Server" @change="handleSync2ServerChange">{{ $t('server.updaterSync2Server') }}</el-checkbox>
-            <Sync class="mgl-1" name="UpdaterSecretKey"></Sync>
-        </div>
-    </el-form-item>
+    <div class="flex flex-items-center">
+        <el-checkbox v-model="state.sync2Server" @change="handleSync2ServerChange">{{ $t('updater.sync2Server') }}</el-checkbox>
+    </div>
 </template>
 <script>
 import { setSync2Server } from '@/apis/updater';
@@ -23,7 +20,7 @@ export default {
         });
         const handleSync2ServerChange = ()=>{
             setSync2Server(state.sync2Server).then(()=>{
-                ElMessage.success(t('common.oper'));
+                ElMessage.success(t('common.opered'));
             }).catch((err)=>{
                 console.log(err);
                 ElMessage.error(t('common.operFail'));

@@ -1,82 +1,98 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace linker.libs.timer
 {
     public static class TimerHelper
     {
-        public static void SetTimeout(Action action, int delayMs)
+        public static void SetTimeout(Action action, int delayMs, CancellationToken cts = default)
         {
             Task.Run(async () =>
             {
-                await Task.Delay(delayMs).ConfigureAwait(false);
+                await Task.Delay(delayMs, cts).ConfigureAwait(false);
                 action();
-            });
+            }, cts);
         }
 
-        public static void SetIntervalLong(Action action, int delayMs)
+        public static void SetIntervalLong(Action action, int delayMs, CancellationToken token = default)
         {
             Task.Run(async () =>
             {
-                while (true)
+                using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromMilliseconds(delayMs));
+                do
                 {
                     action();
-                    await Task.Delay(delayMs).ConfigureAwait(false);
                 }
-            });
+                while (await timer.WaitForNextTickAsync(token));
+            }, token);
         }
-        public static void SetIntervalLong(Func<bool> action, int delayMs)
+        public static void SetIntervalLong(Func<bool> action, int delayMs, CancellationToken token = default)
         {
             Task.Run(async () =>
             {
-                while (action())
+                using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromMilliseconds(delayMs));
+                do
                 {
-                    await Task.Delay(delayMs).ConfigureAwait(false);
+                    if (action() == false)
+                    {
+                        break;
+                    }
                 }
-            });
+                while (await timer.WaitForNextTickAsync(token));
+
+            }, token);
         }
-        public static void SetIntervalLong(Func<Task> action, int delayMs)
+        public static void SetIntervalLong(Func<Task> action, int delayMs, CancellationToken token = default)
         {
             Task.Run(async () =>
             {
-                while (true)
+                using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromMilliseconds(delayMs));
+                do
                 {
                     await action().ConfigureAwait(false);
-                    await Task.Delay(delayMs).ConfigureAwait(false);
                 }
-            });
+                while (await timer.WaitForNextTickAsync(token));
+
+            }, token);
         }
-        public static void SetIntervalLong(Action action, Func<int> delayMs)
+        public static void SetIntervalLong(Action action, Func<int> delayMs, CancellationToken token = default)
         {
             Task.Run(async () =>
             {
-                while (true)
+                using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromMilliseconds(delayMs()));
+                do
                 {
                     action();
-                    await Task.Delay(delayMs()).ConfigureAwait(false);
+                    timer.Period = TimeSpan.FromMilliseconds(delayMs());
                 }
-            });
+                while (await timer.WaitForNextTickAsync(token));
+
+            }, token);
         }
-        public static void SetIntervalLong(Func<Task> action, Func<int> delay)
+        public static void SetIntervalLong(Func<Task> action, Func<int> delayMs, CancellationToken token = default)
         {
             Task.Run(async () =>
             {
-                while (true)
+                using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromMilliseconds(delayMs()));
+                do
                 {
+
                     await action().ConfigureAwait(false);
-                    await Task.Delay(delay()).ConfigureAwait(false);
+                    timer.Period = TimeSpan.FromMilliseconds(delayMs());
                 }
-            });
+                while (await timer.WaitForNextTickAsync(token));
+
+            }, token);
         }
-       
-        public static void Async(Action action)
+
+        public static void Async(Action action, CancellationToken cts = default)
         {
-            Task.Run(action);
+            Task.Run(action, cts);
         }
-        public static void Async(Func<Task> action)
+        public static void Async(Func<Task> action, CancellationToken cts = default)
         {
-            Task.Run(action);
+            Task.Run(action, cts);
         }
     }
-
 }

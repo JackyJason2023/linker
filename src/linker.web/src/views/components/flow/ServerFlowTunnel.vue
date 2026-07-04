@@ -1,33 +1,33 @@
 <template>
-    <el-dialog :title="$t('status.flowTunnel')" class="options-center" top="1vh" destroy-on-close v-model="state.show" width="90%">
+    <el-dialog append-to=".app-wrap" :title="$t('flow.tunnel')" class="options-center" top="1vh" destroy-on-close v-model="state.show" width="80rem">
         <div>
             <el-table :data="state.list" stripe border size="small" width="100%" height="60vh" @sort-change="handleSort">
-                <el-table-column prop="Key" :label="$t('status.flowMachineName')" width="100">
+                <el-table-column prop="Key" :label="$t('flow.src.name')" width="100">
                     <template #default="scope">
                         <span>{{ state.names[scope.row.Key] || 'unknow' }}</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="TransitionId" :label="$t('status.flowTransitionId')">
+                <el-table-column prop="TransitionId" :label="$t('flow.trans')">
                     <template #default="scope">
                         <span>{{ state.transitions[scope.row.TransitionId] || 'unknow' }}</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="Direction" :label="$t('status.flowDirection')">
+                <el-table-column prop="Direction" :label="$t('flow.dir')">
                     <template #default="scope">
                         <span>{{ state.dirs[scope.row.Direction] || 'unknow' }}</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="Type" :label="$t('status.flowType')">
+                <el-table-column prop="Type" :label="$t('flow.type')">
                     <template #default="scope">
                         <span>{{ state.types[scope.row.Type] || 'unknow' }}</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="Mode" :label="$t('status.flowMode')">
+                <el-table-column prop="Mode" :label="$t('flow.mode')">
                     <template #default="scope">
                         <span>{{ state.modes[scope.row.Mode] || 'unknow' }}</span>
                     </template>
                 </el-table-column>
-                <el-table-column prop="ReceiveBytes" :label="$t('status.flowNum')" width="80"></el-table-column>
+                <el-table-column prop="ReceiveBytes" :label="$t('flow.num')" width="80"></el-table-column>
             </el-table>
             <div class="page t-c">
                 <div class="page-wrap">

@@ -2,14 +2,16 @@
 using linker.libs.extends;
 using linker.libs.web;
 using linker.messenger.decenter;
-using linker.messenger.exroute;
+using linker.messenger.rpolicy;
 using linker.messenger.signin;
-using linker.messenger.tunnel;
+using linker.messenger.tunnel.client;
 using linker.messenger.tuntap.cidr;
+using linker.messenger.tuntap.client;
 using linker.messenger.tuntap.lease;
 using linker.messenger.tuntap.messenger;
 using linker.nat;
 using linker.tun;
+using linker.tun.hook;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Text.Json;
@@ -27,7 +29,7 @@ namespace linker.messenger.tuntap
             serviceCollection.AddSingleton<TuntapClientMessenger>();
             serviceCollection.AddSingleton<LeaseClientTreansfer>();
 
-            serviceCollection.AddSingleton<TuntapCidrDecenterExcludeIP>();
+            serviceCollection.AddSingleton<TuntapTunnelExclusionPolicy>();
 
             serviceCollection.AddSingleton<TuntapConfigTransfer>();
             serviceCollection.AddSingleton<TuntapPingTransfer>();
@@ -36,14 +38,14 @@ namespace linker.messenger.tuntap
 
             serviceCollection.AddSingleton<TuntapAdapter>();
 
-            serviceCollection.AddSingleton<TuntapExRoute>();
+            serviceCollection.AddSingleton<TuntapRouteExclusionPolicy>();
 
             serviceCollection.AddSingleton<ITuntapSystemInformation, TuntapSystemInformation>();
 
             serviceCollection.AddSingleton<TuntapCidrConnectionManager>();
             serviceCollection.AddSingleton<TuntapCidrDecenterManager>();
-            serviceCollection.AddSingleton<TuntapCidrMapfileManager>();
 
+            serviceCollection.AddSingleton<LinkerTunPacketHookVlsm>();
 
             return serviceCollection;
         }
@@ -68,16 +70,17 @@ namespace linker.messenger.tuntap
             linker.messenger.api.IWebServer apiServer = serviceProvider.GetService<linker.messenger.api.IWebServer>();
             apiServer.AddPlugins(new List<IApiController> { serviceProvider.GetService<TuntapApiController>() });
 
-            ExRouteTransfer exRouteTransfer = serviceProvider.GetService<ExRouteTransfer>();
-            exRouteTransfer.AddExRoutes(new List<IExRoute> { serviceProvider.GetService<TuntapExRoute>() });
+            RouteExclusionPolicyTransfer routeExclusionPolicyTransfer = serviceProvider.GetService<RouteExclusionPolicyTransfer>();
+            routeExclusionPolicyTransfer.AddRouteExclusionPolicys(new List<IRouteExclusionPolicy> { serviceProvider.GetService<TuntapRouteExclusionPolicy>() });
 
-            TunnelClientExcludeIPTransfer tunnelClientExcludeIPTransfer = serviceProvider.GetService<TunnelClientExcludeIPTransfer>();
-            tunnelClientExcludeIPTransfer.AddTunnelExcludeIPs(new List<ITunnelClientExcludeIP> { serviceProvider.GetService<TuntapCidrDecenterExcludeIP>() });
+            TunnelExclusionPolicyTransfer tunnelClientExcludeIPTransfer = serviceProvider.GetService<TunnelExclusionPolicyTransfer>();
+            tunnelClientExcludeIPTransfer.AddTunnelExclusionPolicyTransfers(new List<ITunnelExclusionPolicy> { serviceProvider.GetService<TuntapTunnelExclusionPolicy>() });
 
             DecenterClientTransfer decenterClientTransfer = serviceProvider.GetService<DecenterClientTransfer>();
             decenterClientTransfer.AddDecenters(new List<IDecenter> { serviceProvider.GetService<TuntapDecenter>() });
 
-            TuntapCidrMapfileManager tuntapCidrMapfileManager = serviceProvider.GetService<TuntapCidrMapfileManager>();
+            LinkerTunDeviceAdapter linkerTunDeviceAdapter = serviceProvider.GetService<LinkerTunDeviceAdapter>();
+            linkerTunDeviceAdapter.AddHooks(new List<ILinkerTunPacketHook> { serviceProvider.GetService<LinkerTunPacketHookVlsm>() });
 
             return serviceProvider;
         }
@@ -96,9 +99,9 @@ namespace linker.messenger.tuntap
                         tuntapClientStore.Info.IP = IPAddress.Parse(ip.GetString());
                         tuntapClientStore.Info.PrefixLength = prefixLength.GetByte();
 
-                        TuntapGroup2IPInfo tuntapGroup2IPInfo = new TuntapGroup2IPInfo { IP = tuntapClientStore.Info.IP, PrefixLength= tuntapClientStore.Info.PrefixLength };
+                        TuntapGroup2IPInfo tuntapGroup2IPInfo = new TuntapGroup2IPInfo { IP = tuntapClientStore.Info.IP, PrefixLength = tuntapClientStore.Info.PrefixLength };
                         tuntapClientStore.Info.Group2IP[signInClientStore.Group.Id] = tuntapGroup2IPInfo;
-                           // .AddOrUpdate(signInClientStore.Group.Id, tuntapGroup2IPInfo,(a,b)=> tuntapGroup2IPInfo);
+                        // .AddOrUpdate(signInClientStore.Group.Id, tuntapGroup2IPInfo,(a,b)=> tuntapGroup2IPInfo);
                     }
                     if (tuntap.TryGetProperty("Lans", out JsonElement lans))
                     {
