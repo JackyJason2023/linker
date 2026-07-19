@@ -15,9 +15,9 @@
 		<PackageProjectUrl>https://github.com/snltty/linker</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/snltty/linker</RepositoryUrl>
 		<PackageReleaseNotes>linker messenger tuntap</PackageReleaseNotes>
-		<Version>2.0.15</Version>
-		<AssemblyVersion>2.0.15</AssemblyVersion>
-		<FileVersion>2.0.15</FileVersion>
+		<Version>2.0.17</Version>
+		<AssemblyVersion>2.0.17</AssemblyVersion>
+		<FileVersion>2.0.17</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -36,6 +36,7 @@
 		<DebugType>embedded</DebugType>
 	</PropertyGroup>
 	<ItemGroup>
+	  <ProjectReference Include="..\linker.discovery\linker.discovery.csproj" />
 	  <ProjectReference Include="..\linker.messenger.access\linker.messenger.access.csproj" />
 	  <ProjectReference Include="..\linker.messenger.api\linker.messenger.api.csproj" />
 	  <ProjectReference Include="..\linker.messenger.channel\linker.messenger.channel.csproj" />

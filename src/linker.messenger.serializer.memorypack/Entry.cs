@@ -13,6 +13,8 @@ namespace linker.messenger.serializer.memorypack
             MemoryPackFormatterProvider.Register(new IPAddressFormatter());
             MemoryPackFormatterProvider.Register(new TunnelConnectionFormatter());
             MemoryPackFormatterProvider.Register(new ConnectionFormatter());
+            MemoryPackFormatterProvider.Register(new BitArrayFormatter());
+            
 
             MemoryPackFormatterProvider.Register(new SignInfoFormatter());
             MemoryPackFormatterProvider.Register(new SignCacheInfoFormatter());
@@ -87,7 +89,7 @@ namespace linker.messenger.serializer.memorypack
             MemoryPackFormatterProvider.Register(new AccessUpdateInfoFormatter());
             MemoryPackFormatterProvider.Register(new AccessBitsUpdateInfoFormatter());
             MemoryPackFormatterProvider.Register(new AccessInfoFormatter());
-            MemoryPackFormatterProvider.Register(new AccessBotsInfoFormatter());
+            MemoryPackFormatterProvider.Register(new AccessBitsInfoFormatter());
             MemoryPackFormatterProvider.Register(new ApiPasswordUpdateInfoFormatter());
 
 
@@ -143,7 +145,8 @@ namespace linker.messenger.serializer.memorypack
             MemoryPackFormatterProvider.Register(new LeaseInfoFormatter());
             MemoryPackFormatterProvider.Register(new LeaseSubInfoFormatter());
             MemoryPackFormatterProvider.Register(new TuntapFecProfileInfoFormatter());
-
+            MemoryPackFormatterProvider.Register(new DiscoveryProtocolSaveInfoFormatter());
+            
 
             MemoryPackFormatterProvider.Register(new PlanInfoFormatter());
             MemoryPackFormatterProvider.Register(new PlanGetInfoFormatter());
